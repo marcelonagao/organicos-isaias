@@ -9,11 +9,20 @@ import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken }
 import { getFirestore, collection, addDoc, onSnapshot, doc, setDoc, getDocs, updateDoc } from 'firebase/firestore';
 
 // --- CONFIGURAÇÃO FIREBASE ---
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+const firebaseConfig = {
+  apiKey: "AIzaSyAn5C_qgjzdb2gf7JaV4ImX58TW1aS8lFo",
+  authDomain: "organicos-isaias.firebaseapp.com",
+  projectId: "organicos-isaias",
+  storageBucket: "organicos-isaias.firebasestorage.app",
+  messagingSenderId: "18242333231",
+  appId: "1:18242333231:web:212a64c1c45e8f1025b4da"
+};
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+// Mantendo um fallback seguro para o appId no caso de testes locais
+const appId = firebaseConfig.projectId || 'default-app-id';
 
 // Função para formatar para Reais (BRL)
 const formatCurrency = (value) => {
