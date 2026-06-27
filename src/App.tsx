@@ -213,7 +213,7 @@ export default function App() {
       const orderData = {
         userId: user.uid,
         customer: { name: checkoutForm.name, phone: checkoutForm.phone },
-        items: cart.map(item => ({ productId: item.id, name: item.name, price: item.price, quantity: item.qty })),
+        items: cart.map(item => ({ productId: item.id, name: item.name, price: item.price, quantity: item.qty, imageUrl: item.imageUrl || '' })),
         totalAmount: cartTotal,
         deliveryAddress: { zipCode: checkoutForm.zipCode, street: checkoutForm.street, number: checkoutForm.number, neighborhood: checkoutForm.neighborhood, city: checkoutForm.city, state: checkoutForm.state },
         deliveryDate: checkoutForm.deliveryDate,
@@ -303,141 +303,158 @@ export default function App() {
         </aside>
 
         {/* Conteúdo Principal do Admin */}
-        <main className="flex-1 h-full overflow-y-auto pt-16 md:pt-0 p-4 md:p-8">
-          
-          {/* Header de Filtro para Abas de Logística */}
-          {['colheita', 'roteiro'].includes(adminTab) && (
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-stone-200 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h2 className="text-xl font-bold text-stone-800">Logística e Separação</h2>
-                <p className="text-sm text-stone-500">Filtrando pedidos agendados.</p>
+        {/* AQUI ESTÁ A CORREÇÃO: bg-stone-100 para a tela inteira e uma div max-w-5xl para não esticar no Notebook */}
+        <main className="flex-1 h-full overflow-y-auto bg-stone-100 pt-16 md:pt-0">
+          <div className="max-w-5xl mx-auto w-full p-4 md:p-8">
+            
+            {/* Header de Filtro para Abas de Logística */}
+            {['colheita', 'roteiro'].includes(adminTab) && (
+              <div className="bg-white p-5 rounded-2xl shadow-sm border border-stone-200 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-bold text-stone-800">Logística e Separação</h2>
+                  <p className="text-sm text-stone-500">Filtrando pedidos agendados.</p>
+                </div>
+                <div className="flex items-center gap-3 bg-stone-50 p-2 rounded-xl border border-stone-100">
+                  <Calendar size={18} className="text-[#008c43] ml-2" />
+                  <select value={adminDateFilter} onChange={(e) => setAdminDateFilter(e.target.value)} className="bg-transparent text-stone-800 font-bold py-1 pr-4 outline-none cursor-pointer">
+                    {settings?.deliveryDays.map(d => <option key={d.dayOfWeek} value={d.dayOfWeek}>{d.dayOfWeek}</option>)}
+                  </select>
+                </div>
               </div>
-              <div className="flex items-center gap-3 bg-stone-50 p-2 rounded-xl border border-stone-100">
-                <Calendar size={18} className="text-[#008c43] ml-2" />
-                <select value={adminDateFilter} onChange={(e) => setAdminDateFilter(e.target.value)} className="bg-transparent text-stone-800 font-bold py-1 pr-4 outline-none cursor-pointer">
-                  {settings?.deliveryDays.map(d => <option key={d.dayOfWeek} value={d.dayOfWeek}>{d.dayOfWeek}</option>)}
-                </select>
-              </div>
-            </div>
-          )}
+            )}
 
-          {/* Abas de Conteúdo (Mesmo código de antes, apenas renderizado aqui) */}
-          {adminTab === 'dashboard' && (
-            <div className="space-y-6 animate-in fade-in">
-              <h2 className="text-2xl font-bold text-stone-800 mb-6">Visão Geral</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200 flex items-center gap-5">
-                  <div className="bg-green-100 p-5 rounded-full text-green-700"><TrendingUp size={28} /></div>
-                  <div><p className="text-sm font-medium text-stone-500">Faturamento Global</p><h3 className="text-3xl font-bold text-stone-800">{formatCurrency(dashboardKPIs.totalRevenue)}</h3></div>
+            {/* Abas de Conteúdo */}
+            {adminTab === 'dashboard' && (
+              <div className="space-y-6 animate-in fade-in">
+                <h2 className="text-2xl font-bold text-stone-800 mb-6">Visão Geral</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200 flex items-center gap-5">
+                    <div className="bg-green-100 p-5 rounded-full text-green-700"><TrendingUp size={28} /></div>
+                    <div><p className="text-sm font-medium text-stone-500">Faturamento Global</p><h3 className="text-3xl font-bold text-stone-800">{formatCurrency(dashboardKPIs.totalRevenue)}</h3></div>
+                  </div>
+                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200 flex items-center gap-5">
+                    <div className="bg-blue-100 p-5 rounded-full text-blue-700"><Package size={28} /></div>
+                    <div><p className="text-sm font-medium text-stone-500">Total de Pedidos</p><h3 className="text-3xl font-bold text-stone-800">{dashboardKPIs.totalOrders}</h3></div>
+                  </div>
                 </div>
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200 flex items-center gap-5">
-                  <div className="bg-blue-100 p-5 rounded-full text-blue-700"><Package size={28} /></div>
-                  <div><p className="text-sm font-medium text-stone-500">Total de Pedidos</p><h3 className="text-3xl font-bold text-stone-800">{dashboardKPIs.totalOrders}</h3></div>
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200">
+                  <h3 className="text-lg font-bold text-stone-800 mb-4 border-b pb-3">Vendas por Cidade</h3>
+                  {Object.keys(dashboardKPIs.citySales).length === 0 ? <p className="text-stone-500 text-sm">Sem dados suficientes.</p> : (
+                    <div className="space-y-3">
+                      {Object.entries(dashboardKPIs.citySales).sort((a, b) => b[1] - a[1]).map(([city, count]) => (
+                        <div key={city} className="flex justify-between items-center bg-stone-50 p-3 rounded-lg"><span className="font-medium text-stone-700">{city}</span><span className="bg-white text-stone-800 px-3 py-1 rounded-full border border-stone-200 text-sm font-bold shadow-sm">{count} pedidos</span></div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200">
-                <h3 className="text-lg font-bold text-stone-800 mb-4 border-b pb-3">Vendas por Cidade</h3>
-                {Object.keys(dashboardKPIs.citySales).length === 0 ? <p className="text-stone-500 text-sm">Sem dados suficientes.</p> : (
-                  <div className="space-y-3">
-                    {Object.entries(dashboardKPIs.citySales).sort((a, b) => b[1] - a[1]).map(([city, count]) => (
-                      <div key={city} className="flex justify-between items-center bg-stone-50 p-3 rounded-lg"><span className="font-medium text-stone-700">{city}</span><span className="bg-white text-stone-800 px-3 py-1 rounded-full border border-stone-200 text-sm font-bold shadow-sm">{count} pedidos</span></div>
+            )}
+
+            {adminTab === 'colheita' && (
+              <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden animate-in fade-in">
+                <div className="bg-[#e6f4ea] p-5 border-b border-[#c8e6c9] flex items-center justify-between">
+                  <h3 className="font-bold text-[#007035] flex items-center gap-2"><Leaf size={20}/> Para colher: {adminDateFilter}</h3>
+                  <span className="bg-white text-[#007035] shadow-sm py-1.5 px-4 rounded-full text-sm font-bold border border-[#c8e6c9]">{adminFilteredOrders.length} Pedidos</span>
+                </div>
+                {harvestList.length === 0 ? <p className="p-12 text-center text-stone-500">Nenhum pedido agendado.</p> : (
+                  <ul className="divide-y divide-stone-100 p-2">
+                    {harvestList.map((item, idx) => (
+                      <li key={idx} className="p-4 flex items-center justify-between hover:bg-stone-50 rounded-xl transition-colors">
+                        <span className="font-medium text-stone-700 text-lg">{item.name}</span>
+                        <span className="font-bold text-2xl text-[#008c43] bg-[#e6f4ea] w-20 h-14 flex items-center justify-center rounded-xl border border-[#c8e6c9]">{item.quantity}</span>
+                      </li>
                     ))}
-                  </div>
+                  </ul>
                 )}
               </div>
-            </div>
-          )}
+            )}
 
-          {adminTab === 'colheita' && (
-            <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden animate-in fade-in">
-              <div className="bg-[#e6f4ea] p-5 border-b border-[#c8e6c9] flex items-center justify-between">
-                <h3 className="font-bold text-[#007035] flex items-center gap-2"><Leaf size={20}/> Para colher: {adminDateFilter}</h3>
-                <span className="bg-white text-[#007035] shadow-sm py-1.5 px-4 rounded-full text-sm font-bold border border-[#c8e6c9]">{adminFilteredOrders.length} Pedidos</span>
-              </div>
-              {harvestList.length === 0 ? <p className="p-12 text-center text-stone-500">Nenhum pedido agendado.</p> : (
-                <ul className="divide-y divide-stone-100 p-2">
-                  {harvestList.map((item, idx) => (
-                    <li key={idx} className="p-4 flex items-center justify-between hover:bg-stone-50 rounded-xl transition-colors">
-                      <span className="font-medium text-stone-700 text-lg">{item.name}</span>
-                      <span className="font-bold text-2xl text-[#008c43] bg-[#e6f4ea] w-20 h-14 flex items-center justify-center rounded-xl border border-[#c8e6c9]">{item.quantity}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-
-          {adminTab === 'roteiro' && (
-            <div className="space-y-6 animate-in fade-in">
-              {Object.keys(ordersByNeighborhood).length === 0 && <p className="text-center py-12 text-stone-500 bg-white rounded-2xl border border-stone-200">Sem entregas.</p>}
-              {Object.keys(ordersByNeighborhood).sort().map(neighborhood => (
-                <div key={neighborhood} className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
-                  <div className="bg-stone-50 p-4 border-b border-stone-200 flex justify-between items-center"><h3 className="font-bold text-stone-800 flex items-center gap-2 text-lg"><MapPin size={20} className="text-orange-500"/> {neighborhood}</h3><span className="text-sm font-bold text-stone-500 bg-white px-3 py-1 rounded-full border">{ordersByNeighborhood[neighborhood].length} entregas</span></div>
-                  <div className="divide-y divide-stone-100">
-                    {ordersByNeighborhood[neighborhood].map(order => (
-                      <div key={order.id} className="p-6 hover:bg-stone-50 transition-colors">
-                        <div className="flex flex-col xl:flex-row justify-between gap-6">
-                          <div className="flex-1">
-                            <h4 className="font-bold text-stone-800 text-lg mb-1">{order.customer.name}</h4><p className="text-sm text-stone-600 font-medium">{order.deliveryAddress.street}, {order.deliveryAddress.number}</p><p className="text-sm text-stone-500 mb-4">WhatsApp: {order.customer.phone}</p>
-                            <div className="bg-stone-100 rounded-xl p-4 inline-block w-full sm:w-auto"><p className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-2">Itens da Caixa</p><ul className="text-sm text-stone-700 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">{order.items.map(i => <li key={i.productId} className="flex gap-2"><span className="font-bold">{i.quantity}x</span> {i.name}</li>)}</ul></div>
-                          </div>
-                          <div className="flex flex-col lg:items-end w-full xl:w-72 gap-3">
-                            <div className={`p-4 rounded-xl border w-full text-center ${order.paymentInfo.method === 'cash' ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}><span className="block text-[11px] font-bold uppercase tracking-widest text-stone-500 mb-1">{order.paymentInfo.method === 'cash' ? 'Receber no Local' : 'Pago online'}</span><span className="text-3xl font-bold text-stone-800 block">{formatCurrency(order.totalAmount)}</span>{order.paymentInfo.method === 'cash' && order.paymentInfo.changeFor && (<span className="mt-2 inline-block text-xs font-bold text-green-800 bg-green-200 px-3 py-1 rounded-full">Troco para: {order.paymentInfo.changeFor}</span>)}</div>
-                            <div className="w-full flex gap-2">
-                              {order.status === 'pending' && <button onClick={() => updateOrderStatus(order.id, 'preparing')} className="w-full bg-stone-800 text-white py-3 rounded-xl text-sm font-bold hover:bg-stone-700 transition-colors">Marcar Separado</button>}
-                              {order.status === 'preparing' && <button onClick={() => updateOrderStatus(order.id, 'in_transit')} className="w-full bg-purple-600 text-white py-3 rounded-xl text-sm font-bold hover:bg-purple-700 transition-colors">Pôr no Carro</button>}
-                              {order.status === 'in_transit' && <button onClick={() => updateOrderStatus(order.id, 'delivered')} className="w-full bg-[#008c43] text-white py-3 rounded-xl text-sm font-bold hover:bg-[#007035] transition-colors">Finalizar Entrega ✓</button>}
-                              {order.status === 'delivered' && <span className="w-full bg-stone-100 text-green-700 py-3 rounded-xl text-sm font-bold text-center border border-stone-200">Finalizado</span>}
+            {adminTab === 'roteiro' && (
+              <div className="space-y-6 animate-in fade-in">
+                {Object.keys(ordersByNeighborhood).length === 0 && <p className="text-center py-12 text-stone-500 bg-white rounded-2xl border border-stone-200">Sem entregas.</p>}
+                {Object.keys(ordersByNeighborhood).sort().map(neighborhood => (
+                  <div key={neighborhood} className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
+                    <div className="bg-stone-50 p-4 border-b border-stone-200 flex justify-between items-center"><h3 className="font-bold text-stone-800 flex items-center gap-2 text-lg"><MapPin size={20} className="text-orange-500"/> {neighborhood}</h3><span className="text-sm font-bold text-stone-500 bg-white px-3 py-1 rounded-full border">{ordersByNeighborhood[neighborhood].length} entregas</span></div>
+                    <div className="divide-y divide-stone-100">
+                      {ordersByNeighborhood[neighborhood].map(order => (
+                        <div key={order.id} className="p-6 hover:bg-stone-50 transition-colors">
+                          <div className="flex flex-col xl:flex-row justify-between gap-6">
+                            <div className="flex-1">
+                              <h4 className="font-bold text-stone-800 text-lg mb-1">{order.customer.name}</h4><p className="text-sm text-stone-600 font-medium">{order.deliveryAddress.street}, {order.deliveryAddress.number}</p><p className="text-sm text-stone-500 mb-4">WhatsApp: {order.customer.phone}</p>
+                              <div className="bg-stone-100 rounded-xl p-4 inline-block w-full sm:w-auto"><p className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-2">Itens da Caixa</p><ul className="text-sm text-stone-700 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">{order.items.map(i => <li key={i.productId} className="flex gap-2"><span className="font-bold">{i.quantity}x</span> {i.name}</li>)}</ul></div>
+                            </div>
+                            <div className="flex flex-col lg:items-end w-full xl:w-72 gap-3">
+                              <div className={`p-4 rounded-xl border w-full text-center ${order.paymentInfo.method === 'cash' ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}><span className="block text-[11px] font-bold uppercase tracking-widest text-stone-500 mb-1">{order.paymentInfo.method === 'cash' ? 'Receber no Local' : 'Pago online'}</span><span className="text-3xl font-bold text-stone-800 block">{formatCurrency(order.totalAmount)}</span>{order.paymentInfo.method === 'cash' && order.paymentInfo.changeFor && (<span className="mt-2 inline-block text-xs font-bold text-green-800 bg-green-200 px-3 py-1 rounded-full">Troco para: {order.paymentInfo.changeFor}</span>)}</div>
+                              <div className="w-full flex gap-2">
+                                {order.status === 'pending' && <button onClick={() => updateOrderStatus(order.id, 'preparing')} className="w-full bg-stone-800 text-white py-3 rounded-xl text-sm font-bold hover:bg-stone-700 transition-colors">Marcar Separado</button>}
+                                {order.status === 'preparing' && <button onClick={() => updateOrderStatus(order.id, 'in_transit')} className="w-full bg-purple-600 text-white py-3 rounded-xl text-sm font-bold hover:bg-purple-700 transition-colors">Pôr no Carro</button>}
+                                {order.status === 'in_transit' && <button onClick={() => updateOrderStatus(order.id, 'delivered')} className="w-full bg-[#008c43] text-white py-3 rounded-xl text-sm font-bold hover:bg-[#007035] transition-colors">Finalizar Entrega ✓</button>}
+                                {order.status === 'delivered' && <span className="w-full bg-stone-100 text-green-700 py-3 rounded-xl text-sm font-bold text-center border border-stone-200">Finalizado</span>}
+                              </div>
                             </div>
                           </div>
                         </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {adminTab === 'catalogo' && (
+              <div className="space-y-6 animate-in fade-in">
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div><h3 className="text-lg font-bold text-stone-800">Catálogo de Produtos</h3><p className="text-sm text-stone-500">Gerencie a disponibilidade ou crie novos.</p></div>
+                  <button onClick={() => setShowNewProductForm(!showNewProductForm)} className="bg-[#008c43] text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#007035]">{showNewProductForm ? 'Cancelar' : <><Plus size={18}/> Novo Produto</>}</button>
+                </div>
+
+                {/* CORREÇÃO AQUI: Formulário atualizado para orientar sobre Link da Imagem */}
+                {showNewProductForm && (
+                  <div className="bg-[#e6f4ea] p-6 rounded-2xl border border-[#c8e6c9] animate-in slide-in-from-top-4">
+                    <form onSubmit={handleAddNewProduct} className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div><label className="block text-sm font-bold text-green-800 mb-1">Nome do Produto</label><input required type="text" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Ex: Rúcula Fresca" /></div>
+                        <div><label className="block text-sm font-bold text-green-800 mb-1">Preço (R$)</label><input required type="number" step="0.01" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Ex: 4.50" /></div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div><label className="block text-sm font-bold text-green-800 mb-1">Unidade</label><select value={newProduct.unit} onChange={e => setNewProduct({...newProduct, unit: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl bg-white"><option value="maço">Maço</option><option value="kg">Quilo (kg)</option><option value="unidade">Unidade</option><option value="bandeja">Bandeja</option></select></div>
+                        <div><label className="block text-sm font-bold text-green-800 mb-1">Categoria</label><select value={newProduct.category} onChange={e => setNewProduct({...newProduct, category: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl bg-white"><option value="Verduras">Verduras</option><option value="Legumes">Legumes</option><option value="Frutas">Frutas</option><option value="Cestas">Cestas</option><option value="Outros">Outros</option></select></div>
+                        
+                        <div>
+                          <label className="block text-sm font-bold text-green-800 mb-1">Link da Foto (URL) ou Emoji</label>
+                          <input required type="text" value={newProduct.imageUrl} onChange={e => setNewProduct({...newProduct, imageUrl: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl" placeholder="Ex: https://... ou 🥬" />
+                        </div>
+                      </div>
+                      <button type="submit" className="bg-[#007035] text-white px-8 py-3 rounded-xl font-bold w-full md:w-auto mt-2">Salvar no Catálogo</button>
+                    </form>
+                  </div>
+                )}
+
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {products.map(p => (
+                      <div key={p.id} className={`flex items-center justify-between p-4 border rounded-xl transition-colors ${!p.isActive ? 'bg-stone-50 border-stone-200' : 'border-stone-300'}`}>
+                        <div className="flex items-center gap-3">
+                          
+                          {/* CORREÇÃO AQUI: Catálogo Admin desenhando fotos reais */}
+                          <div className={`w-12 h-12 flex-shrink-0 flex items-center justify-center text-3xl overflow-hidden rounded-lg ${!p.isActive && 'opacity-40 grayscale'}`}>
+                            {p.imageUrl?.startsWith('http') ? (
+                              <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <span>{p.imageUrl}</span>
+                            )}
+                          </div>
+
+                          <div><span className={`text-sm font-bold pr-2 block ${!p.isActive ? 'text-stone-400 line-through' : 'text-stone-800'}`}>{p.name}</span><span className="text-xs font-medium text-stone-500">{formatCurrency(p.price)}</span></div>
+                        </div>
+                        <button onClick={() => toggleProductStatus(p.id, p.isActive)} className={`w-12 h-6 rounded-full relative transition-colors shadow-inner flex-shrink-0 ${p.isActive ? 'bg-[#008c43]' : 'bg-stone-300'}`}><div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all shadow-sm ${p.isActive ? 'left-7' : 'left-1'}`}></div></button>
                       </div>
                     ))}
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-
-          {adminTab === 'catalogo' && (
-            <div className="space-y-6 animate-in fade-in">
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div><h3 className="text-lg font-bold text-stone-800">Catálogo de Produtos</h3><p className="text-sm text-stone-500">Gerencie a disponibilidade.</p></div>
-                <button onClick={() => setShowNewProductForm(!showNewProductForm)} className="bg-[#008c43] text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#007035]">{showNewProductForm ? 'Cancelar' : <><Plus size={18}/> Novo Produto</>}</button>
               </div>
-
-              {showNewProductForm && (
-                <div className="bg-[#e6f4ea] p-6 rounded-2xl border border-[#c8e6c9] animate-in slide-in-from-top-4">
-                  <form onSubmit={handleAddNewProduct} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div><label className="block text-sm font-bold text-green-800 mb-1">Nome do Produto</label><input required type="text" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Ex: Rúcula Fresca" /></div>
-                      <div><label className="block text-sm font-bold text-green-800 mb-1">Preço (R$)</label><input required type="number" step="0.01" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Ex: 4.50" /></div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div><label className="block text-sm font-bold text-green-800 mb-1">Unidade</label><select value={newProduct.unit} onChange={e => setNewProduct({...newProduct, unit: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl bg-white"><option value="maço">Maço</option><option value="kg">Quilo (kg)</option><option value="unidade">Unidade</option><option value="bandeja">Bandeja</option></select></div>
-                      <div><label className="block text-sm font-bold text-green-800 mb-1">Categoria</label><select value={newProduct.category} onChange={e => setNewProduct({...newProduct, category: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl bg-white"><option value="Verduras">Verduras</option><option value="Legumes">Legumes</option><option value="Frutas">Frutas</option><option value="Cestas">Cestas</option><option value="Outros">Outros</option></select></div>
-                      <div><label className="block text-sm font-bold text-green-800 mb-1">Emoji / Ícone</label><input required type="text" value={newProduct.imageUrl} onChange={e => setNewProduct({...newProduct, imageUrl: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl" placeholder="Ex: 🥬" /></div>
-                    </div>
-                    <button type="submit" className="bg-[#007035] text-white px-8 py-3 rounded-xl font-bold w-full md:w-auto mt-2">Salvar no Catálogo</button>
-                  </form>
-                </div>
-              )}
-
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200">
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {products.map(p => (
-                    <div key={p.id} className={`flex items-center justify-between p-4 border rounded-xl transition-colors ${!p.isActive ? 'bg-stone-50 border-stone-200' : 'border-stone-300'}`}>
-                      <div className="flex items-center gap-3">
-                        <span className={`text-3xl ${!p.isActive && 'opacity-40 grayscale'}`}>{p.imageUrl}</span>
-                        <div><span className={`text-sm font-bold pr-2 block ${!p.isActive ? 'text-stone-400 line-through' : 'text-stone-800'}`}>{p.name}</span><span className="text-xs font-medium text-stone-500">{formatCurrency(p.price)}</span></div>
-                      </div>
-                      <button onClick={() => toggleProductStatus(p.id, p.isActive)} className={`w-12 h-6 rounded-full relative transition-colors shadow-inner flex-shrink-0 ${p.isActive ? 'bg-[#008c43]' : 'bg-stone-300'}`}><div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all shadow-sm ${p.isActive ? 'left-7' : 'left-1'}`}></div></button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </main>
       </div>
     );
@@ -564,7 +581,12 @@ export default function App() {
                   {cart.map(item => (
                     <div key={item.id} className="p-5 border-b border-stone-100 flex items-center justify-between gap-4 last:border-0 hover:bg-stone-50 transition-colors">
                       <div className="flex items-center gap-4 w-full sm:w-auto">
-                        <div className="w-20 h-20 bg-stone-100 rounded-2xl border border-stone-200 flex items-center justify-center flex-shrink-0 text-4xl">{item.imageUrl}</div>
+                        
+                        {/* CORREÇÃO AQUI: Suporte a foto no carrinho */}
+                        <div className="w-20 h-20 bg-stone-100 rounded-2xl border border-stone-200 flex items-center justify-center flex-shrink-0 text-4xl overflow-hidden">
+                          {item.imageUrl?.startsWith('http') ? <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" /> : item.imageUrl}
+                        </div>
+
                         <div className="flex-grow">
                           <h4 className="font-bold text-stone-800 text-base">{item.name}</h4>
                           <span className="text-stone-500 font-medium text-sm block mt-1">{formatCurrency(item.price)}</span>
