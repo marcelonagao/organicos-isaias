@@ -2,10 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ShoppingCart, Leaf, MapPin, Calendar, 
   CreditCard, Banknote, ChevronLeft, ChevronRight, Plus, Minus, CheckCircle2,
-  Store, Search, User, Package, Clock, Truck, ShieldCheck, Map, ListChecks, Tags, BarChart3, TrendingUp, Menu, X, Edit2
+  Store, Search, User, Package, Clock, Truck, ShieldCheck, Map, ListChecks, Tags, BarChart3, TrendingUp, Menu, X, Edit2, Lock
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
+import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { getFirestore, collection, addDoc, onSnapshot, doc, setDoc, getDocs, updateDoc } from 'firebase/firestore';
 
 // --- CONFIGURAÇÃO FIREBASE ---
@@ -50,10 +50,13 @@ export default function App() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('Todos');
 
-  // Estados do Painel Admin (Sidebar)
+  // Estados do Painel Admin (Sidebar & Autenticação)
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
   const [adminTab, setAdminTab] = useState('dashboard');
   const [adminDateFilter, setAdminDateFilter] = useState('');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Para mobile
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showNewProductForm, setShowNewProductForm] = useState(false);
   const [newProduct, setNewProduct] = useState({ name: '', price: '', unit: 'unidade', category: 'Verduras', imageUrl: '📦' });
 
@@ -64,80 +67,75 @@ export default function App() {
     deliveryDate: '', paymentMethod: 'cash', changeFor: ''
   });
 
-  // --- AUTENTICAÇÃO ---
+  // --- AUTENTICAÇÃO E SESSÃO ---
   useEffect(() => {
     const initAuth = async () => {
       try {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
           await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
+        } else if (!auth.currentUser) {
           await signInAnonymously(auth);
         }
       } catch (error) { console.error("Erro na autenticação:", error); }
     };
-    initAuth();
-    const unsubscribe = onAuthStateChanged(auth, setUser);
+
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser) {
+        setUser(currentUser);
+        // Se o utilizador não for anónimo, assumimos que iniciou sessão com e-mail/palavra-passe (Administrador)
+        if (!currentUser.isAnonymous) {
+          setIsAdmin(true);
+        } else {
+          setIsAdmin(false);
+        }
+      } else {
+        // Se for feito o término de sessão, inicia novamente uma sessão anónima para a vitrine
+        initAuth();
+      }
+    });
+
     return () => unsubscribe();
   }, []);
-
-  // --- MOCK INICIAL ---
-  const seedDatabase = async () => {
-    const productsRef = collection(db, 'artifacts', appId, 'public', 'data', 'products');
-    const settingsRef = collection(db, 'artifacts', appId, 'public', 'data', 'settings');
-    const productsSnap = await getDocs(productsRef);
-    if (productsSnap.empty) {
-      const mockProducts = [
-        { name: "Alface Crespa Fresca", price: 3.50, unit: "maço", category: "Verduras", imageUrl: "🥬", isActive: true },
-        { name: "Tomate Orgânico 1Kg", price: 8.00, unit: "kg", category: "Legumes", imageUrl: "🍅", isActive: true },
-        { name: "Cenoura com Rama", price: 6.50, unit: "maço", category: "Legumes", imageUrl: "🥕", isActive: true },
-        { name: "Batata Doce Orgânica 1Kg", price: 5.50, unit: "kg", category: "Legumes", imageUrl: "🍠", isActive: true },
-        { name: "Maçã Fuji 1Kg", price: 12.00, unit: "kg", category: "Frutas", imageUrl: "🍎", isActive: true },
-        { name: "Cesta Completa da Semana", price: 45.00, unit: "unidade", category: "Cestas", imageUrl: "🧺", description: "Seleção variada", isActive: true }
-      ];
-      for (const prod of mockProducts) await addDoc(productsRef, prod);
-    }
-    const settingsSnap = await getDocs(settingsRef);
-    if (settingsSnap.empty) {
-      await setDoc(doc(settingsRef, 'store_config'), {
-        isOpen: true,
-        deliveryDays: [{ dayOfWeek: "Terça-feira", active: true }, { dayOfWeek: "Sexta-feira", active: true }]
-      });
-    }
-  };
 
   // --- BUSCA DE DADOS (FIRESTORE) ---
   useEffect(() => {
     if (!user) return;
-    seedDatabase().then(() => {
-      const productsRef = collection(db, 'artifacts', appId, 'public', 'data', 'products');
-      const unsubProducts = onSnapshot(productsRef, (snapshot) => {
-        setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        setLoading(false);
-      });
-
-      const settingsRef = collection(db, 'artifacts', appId, 'public', 'data', 'settings');
-      const unsubSettings = onSnapshot(settingsRef, (snapshot) => {
-        const configDoc = snapshot.docs.find(doc => doc.id === 'store_config');
-        if (configDoc) {
-          setSettings(configDoc.data());
-          const activeDays = configDoc.data().deliveryDays.filter(d => d.active);
-          if (activeDays.length > 0) {
-            setCheckoutForm(prev => ({ ...prev, deliveryDate: activeDays[0].dayOfWeek }));
-            if(!adminDateFilter) setAdminDateFilter(activeDays[0].dayOfWeek); 
-          }
-        }
-      });
-
-      const ordersRef = collection(db, 'artifacts', appId, 'public', 'data', 'orders');
-      const unsubOrders = onSnapshot(ordersRef, (snapshot) => {
-        const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        fetchedOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        setAllOrders(fetchedOrders);
-        setOrders(fetchedOrders.filter(o => o.userId === user.uid));
-      });
-
-      return () => { unsubProducts(); unsubSettings(); unsubOrders(); };
+    
+    const productsRef = collection(db, 'artifacts', appId, 'public', 'data', 'products');
+    const unsubProducts = onSnapshot(productsRef, (snapshot) => {
+      setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setLoading(false);
     });
+
+    const settingsRef = collection(db, 'artifacts', appId, 'public', 'data', 'settings');
+    const unsubSettings = onSnapshot(settingsRef, async (snapshot) => {
+      const configDoc = snapshot.docs.find(doc => doc.id === 'store_config');
+      if (configDoc) {
+        const data = configDoc.data();
+        setSettings(data);
+        const activeDays = data.deliveryDays.filter(d => d.active);
+        if (activeDays.length > 0) {
+          setCheckoutForm(prev => ({ ...prev, deliveryDate: prev.deliveryDate || activeDays[0].dayOfWeek }));
+          setAdminDateFilter(prev => prev || activeDays[0].dayOfWeek); 
+        }
+      } else {
+        // Cria uma configuração base mínima para a loja não bloquear caso seja apagada
+        await setDoc(doc(settingsRef, 'store_config'), {
+          isOpen: true,
+          deliveryDays: [{ dayOfWeek: "Terça-feira", active: true }, { dayOfWeek: "Sexta-feira", active: true }]
+        });
+      }
+    });
+
+    const ordersRef = collection(db, 'artifacts', appId, 'public', 'data', 'orders');
+    const unsubOrders = onSnapshot(ordersRef, (snapshot) => {
+      const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      fetchedOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setAllOrders(fetchedOrders);
+      setOrders(fetchedOrders.filter(o => o.userId === user.uid));
+    });
+
+    return () => { unsubProducts(); unsubSettings(); unsubOrders(); };
   }, [user]);
 
   // --- LÓGICA DO CARRINHO ---
@@ -184,6 +182,28 @@ export default function App() {
     return { totalRevenue, totalOrders, citySales };
   }, [allOrders]);
 
+  // --- AÇÕES DO ADMINISTRADOR (LOGIN E LOGOUT) ---
+  const handleAdminLogin = async (e) => {
+    e.preventDefault();
+    setLoginError('');
+    setIsProcessing(true);
+    try {
+      await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
+      setView('admin');
+      setAdminEmail('');
+      setAdminPassword('');
+    } catch (error) {
+      setLoginError('Credenciais inválidas. Verifique o e-mail e a palavra-passe.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleAdminLogout = async () => {
+    await signOut(auth);
+    setView('home');
+  };
+
   // --- LÓGICA DE CHECKOUT E API ---
   const handleFormChange = (e) => setCheckoutForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
   const handleCepChange = async (e) => {
@@ -227,7 +247,7 @@ export default function App() {
       };
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'orders'), orderData);
       setCart([]);
-      setCheckoutStep(1); // Reseta para a próxima compra
+      setCheckoutStep(1); 
       setView('success');
     } catch (error) { alert("Erro ao processar pedido."); } 
     finally { setIsProcessing(false); }
@@ -296,14 +316,13 @@ export default function App() {
           </div>
 
           <div className="mt-auto p-4 border-t border-stone-800">
-            <button onClick={() => { setIsAdmin(false); setView('home'); }} className="flex items-center gap-3 px-4 py-3 w-full rounded-lg font-medium hover:bg-stone-800 text-stone-400 hover:text-white transition-colors">
+            <button onClick={handleAdminLogout} className="flex items-center gap-3 px-4 py-3 w-full rounded-lg font-medium hover:bg-stone-800 text-stone-400 hover:text-white transition-colors">
               <ChevronLeft size={18} /> Sair do Painel
             </button>
           </div>
         </aside>
 
         {/* Conteúdo Principal do Admin */}
-        {/* AQUI ESTÁ A CORREÇÃO: bg-stone-100 para a tela inteira e uma div max-w-5xl para não esticar no Notebook */}
         <main className="flex-1 h-full overflow-y-auto bg-stone-100 pt-16 md:pt-0">
           <div className="max-w-5xl mx-auto w-full p-4 md:p-8">
             
@@ -408,7 +427,6 @@ export default function App() {
                   <button onClick={() => setShowNewProductForm(!showNewProductForm)} className="bg-[#008c43] text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#007035]">{showNewProductForm ? 'Cancelar' : <><Plus size={18}/> Novo Produto</>}</button>
                 </div>
 
-                {/* CORREÇÃO AQUI: Formulário atualizado para orientar sobre Link da Imagem */}
                 {showNewProductForm && (
                   <div className="bg-[#e6f4ea] p-6 rounded-2xl border border-[#c8e6c9] animate-in slide-in-from-top-4">
                     <form onSubmit={handleAddNewProduct} className="space-y-4">
@@ -419,13 +437,12 @@ export default function App() {
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div><label className="block text-sm font-bold text-green-800 mb-1">Unidade</label><select value={newProduct.unit} onChange={e => setNewProduct({...newProduct, unit: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl bg-white"><option value="maço">Maço</option><option value="kg">Quilo (kg)</option><option value="unidade">Unidade</option><option value="bandeja">Bandeja</option></select></div>
                         <div><label className="block text-sm font-bold text-green-800 mb-1">Categoria</label><select value={newProduct.category} onChange={e => setNewProduct({...newProduct, category: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl bg-white"><option value="Verduras">Verduras</option><option value="Legumes">Legumes</option><option value="Frutas">Frutas</option><option value="Cestas">Cestas</option><option value="Outros">Outros</option></select></div>
-                        
                         <div>
                           <label className="block text-sm font-bold text-green-800 mb-1">Link da Foto (URL) ou Emoji</label>
                           <input required type="text" value={newProduct.imageUrl} onChange={e => setNewProduct({...newProduct, imageUrl: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl" placeholder="Ex: https://... ou 🥬" />
                         </div>
                       </div>
-                      <button type="submit" className="bg-[#007035] text-white px-8 py-3 rounded-xl font-bold w-full md:w-auto mt-2">Salvar no Catálogo</button>
+                      <button type="submit" className="bg-[#007035] text-white px-8 py-3 rounded-xl font-bold w-full md:w-auto mt-2 hover:bg-green-800 transition-colors">Salvar no Catálogo</button>
                     </form>
                   </div>
                 )}
@@ -435,16 +452,9 @@ export default function App() {
                     {products.map(p => (
                       <div key={p.id} className={`flex items-center justify-between p-4 border rounded-xl transition-colors ${!p.isActive ? 'bg-stone-50 border-stone-200' : 'border-stone-300'}`}>
                         <div className="flex items-center gap-3">
-                          
-                          {/* CORREÇÃO AQUI: Catálogo Admin desenhando fotos reais */}
                           <div className={`w-12 h-12 flex-shrink-0 flex items-center justify-center text-3xl overflow-hidden rounded-lg ${!p.isActive && 'opacity-40 grayscale'}`}>
-                            {p.imageUrl?.startsWith('http') ? (
-                              <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
-                            ) : (
-                              <span>{p.imageUrl}</span>
-                            )}
+                            {p.imageUrl?.startsWith('http') ? <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" /> : <span>{p.imageUrl}</span>}
                           </div>
-
                           <div><span className={`text-sm font-bold pr-2 block ${!p.isActive ? 'text-stone-400 line-through' : 'text-stone-800'}`}>{p.name}</span><span className="text-xs font-medium text-stone-500">{formatCurrency(p.price)}</span></div>
                         </div>
                         <button onClick={() => toggleProductStatus(p.id, p.isActive)} className={`w-12 h-6 rounded-full relative transition-colors shadow-inner flex-shrink-0 ${p.isActive ? 'bg-[#008c43]' : 'bg-stone-300'}`}><div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all shadow-sm ${p.isActive ? 'left-7' : 'left-1'}`}></div></button>
@@ -461,12 +471,63 @@ export default function App() {
   }
 
   // ==========================================
+  // VISTA DO LOGIN DO ADMIN
+  // ==========================================
+  if (view === 'adminLogin') {
+    return (
+      <div className="min-h-screen bg-[#f5f5f5] font-sans flex flex-col">
+        <header className="bg-[#005e33] text-white p-4 shadow-sm">
+          <div className="container mx-auto flex items-center gap-2 cursor-pointer max-w-5xl" onClick={() => setView('home')}>
+            <Leaf size={24} />
+            <h1 className="text-lg font-semibold tracking-tight">Clube Orgânicos Izaias</h1>
+          </div>
+        </header>
+
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="bg-white p-8 rounded-3xl shadow-lg border border-stone-200 w-full max-w-md animate-in fade-in zoom-in">
+            <div className="text-center mb-8">
+              <div className="w-16 h-16 bg-stone-100 rounded-full flex items-center justify-center mx-auto mb-4 text-stone-800">
+                <ShieldCheck size={32} />
+              </div>
+              <h2 className="text-2xl font-bold text-stone-800">Acesso Restrito</h2>
+              <p className="text-sm text-stone-500 mt-1">Área exclusiva para a gestão da loja.</p>
+            </div>
+
+            <form onSubmit={handleAdminLogin} className="space-y-5">
+              {loginError && (
+                <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm font-medium text-center border border-red-100">
+                  {loginError}
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-bold text-stone-600 mb-2">E-mail</label>
+                <input required type="email" value={adminEmail} onChange={e => setAdminEmail(e.target.value)} className="w-full p-4 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-[#008c43] outline-none" placeholder="admin@organicos.com" />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-stone-600 mb-2">Palavra-passe</label>
+                <input required type="password" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} className="w-full p-4 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-[#008c43] outline-none" placeholder="••••••••" />
+              </div>
+              <button type="submit" disabled={isProcessing} className="w-full bg-[#008c43] text-white py-4 rounded-xl font-bold hover:bg-[#007035] transition-colors mt-2 disabled:bg-stone-400">
+                {isProcessing ? 'A iniciar sessão...' : 'Entrar no Painel'}
+              </button>
+            </form>
+
+            <button onClick={() => setView('home')} className="w-full mt-6 text-stone-500 font-medium text-sm hover:text-stone-800 transition-colors flex items-center justify-center gap-2">
+              <ChevronLeft size={16} /> Voltar à Loja
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ==========================================
   // VISTAS DO CLIENTE (LOJA)
   // ==========================================
   return (
-    <div className="min-h-screen bg-[#f5f5f5] font-sans pb-28">
+    <div className="min-h-screen bg-[#f5f5f5] font-sans flex flex-col">
       {/* CABEÇALHO CLIENTE */}
-      <header className="bg-[#005e33] text-white p-4 shadow-sm sticky top-0 z-10">
+      <header className="bg-[#005e33] text-white p-4 shadow-sm sticky top-0 z-10 flex-shrink-0">
         <div className="container mx-auto flex flex-col gap-4 max-w-5xl">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView('home')}>
@@ -485,11 +546,11 @@ export default function App() {
         </div>
       </header>
 
-      <main className="container mx-auto p-4 max-w-5xl mt-2">
+      <main className="container mx-auto p-4 max-w-5xl mt-2 flex-1">
         
         {/* --- VISTA: VITRINE --- */}
         {view === 'home' && (
-          <div className="animate-in fade-in">
+          <div className="animate-in fade-in pb-20">
             <div className="flex overflow-x-auto gap-2 pb-4 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
               {categories.map(cat => (
                 <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-5 py-2.5 rounded-full text-sm font-bold whitespace-nowrap border transition-colors shadow-sm ${selectedCategory === cat ? 'bg-[#005e33] text-white border-[#005e33]' : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-50'}`}>
@@ -504,37 +565,44 @@ export default function App() {
                </div>
             )}
 
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 mt-2">
-              {displayedProducts.map(product => {
-                const cartItem = cart.find(item => item.id === product.id);
-                return (
-                  <div key={product.id} className={`bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden flex flex-col p-3 ${!settings?.isOpen ? 'opacity-60 pointer-events-none' : ''}`}>
-                    <div className="w-full aspect-square bg-stone-50 rounded-xl flex flex-col items-center justify-center overflow-hidden mb-3">
-                      {product.imageUrl?.startsWith('http') ? <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" /> : <span className="text-6xl">{product.imageUrl}</span>}
-                    </div>
-                    <div className="flex flex-col flex-grow">
-                      <h3 className="text-[13px] sm:text-sm font-bold text-stone-800 leading-snug line-clamp-2">{product.name}</h3>
-                      <span className="text-[11px] sm:text-xs text-stone-500 mt-1">{product.description || `Por ${product.unit}`}</span>
-                      <div className="mt-auto pt-3">
-                        <span className="text-lg sm:text-xl font-extrabold text-stone-900 flex items-baseline gap-1 mb-3">
-                          {formatCurrency(product.price)} <span className="text-[10px] font-medium text-stone-400">/{product.unit}</span>
-                        </span>
-                        
-                        {cartItem ? (
-                          <div className="w-full flex items-center justify-between bg-[#e6f4ea] border border-[#c8e6c9] rounded-xl h-10 px-1">
-                            <button onClick={() => updateQty(product.id, -1)} className="w-8 h-full flex items-center justify-center text-[#008c43]"><Minus size={18} /></button>
-                            <span className="font-bold text-[#008c43]">{cartItem.qty}</span>
-                            <button onClick={() => updateQty(product.id, 1)} className="w-8 h-full flex items-center justify-center text-[#008c43]"><Plus size={18} /></button>
-                          </div>
-                        ) : (
-                          <button onClick={() => addToCart(product)} className="w-full bg-[#e6f4ea] text-[#008c43] font-bold py-2 rounded-xl text-sm border border-[#c8e6c9] hover:bg-[#d0ebd6] h-10 transition-colors">Adicionar</button>
-                        )}
+            {products.length === 0 ? (
+              <div className="text-center py-20">
+                <Leaf size={48} className="mx-auto text-stone-300 mb-4" />
+                <p className="text-stone-500 font-medium">O catálogo de produtos será atualizado em breve.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 mt-2">
+                {displayedProducts.map(product => {
+                  const cartItem = cart.find(item => item.id === product.id);
+                  return (
+                    <div key={product.id} className={`bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden flex flex-col p-3 ${!settings?.isOpen ? 'opacity-60 pointer-events-none' : ''}`}>
+                      <div className="w-full aspect-square bg-stone-50 rounded-xl flex flex-col items-center justify-center overflow-hidden mb-3">
+                        {product.imageUrl?.startsWith('http') ? <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" /> : <span className="text-6xl">{product.imageUrl}</span>}
+                      </div>
+                      <div className="flex flex-col flex-grow">
+                        <h3 className="text-[13px] sm:text-sm font-bold text-stone-800 leading-snug line-clamp-2">{product.name}</h3>
+                        <span className="text-[11px] sm:text-xs text-stone-500 mt-1">{product.description || `Por ${product.unit}`}</span>
+                        <div className="mt-auto pt-3">
+                          <span className="text-lg sm:text-xl font-extrabold text-stone-900 flex items-baseline gap-1 mb-3">
+                            {formatCurrency(product.price)} <span className="text-[10px] font-medium text-stone-400">/{product.unit}</span>
+                          </span>
+                          
+                          {cartItem ? (
+                            <div className="w-full flex items-center justify-between bg-[#e6f4ea] border border-[#c8e6c9] rounded-xl h-10 px-1">
+                              <button onClick={() => updateQty(product.id, -1)} className="w-8 h-full flex items-center justify-center text-[#008c43]"><Minus size={18} /></button>
+                              <span className="font-bold text-[#008c43]">{cartItem.qty}</span>
+                              <button onClick={() => updateQty(product.id, 1)} className="w-8 h-full flex items-center justify-center text-[#008c43]"><Plus size={18} /></button>
+                            </div>
+                          ) : (
+                            <button onClick={() => addToCart(product)} className="w-full bg-[#e6f4ea] text-[#008c43] font-bold py-2 rounded-xl text-sm border border-[#c8e6c9] hover:bg-[#d0ebd6] h-10 transition-colors">Adicionar</button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Barra Flutuante Mobile */}
             {cartItemsCount > 0 && (
@@ -564,12 +632,20 @@ export default function App() {
                 </button>
               </div>
             )}
+
+            {/* Rodapé e Link de Admin */}
+            <footer className="mt-16 py-8 text-center text-stone-400 text-xs border-t border-stone-200 w-full">
+              <p>© {new Date().getFullYear()} Clube Orgânicos Izaias. Todos os direitos reservados.</p>
+              <button onClick={() => setView('adminLogin')} className="mt-4 hover:text-stone-600 transition-colors flex items-center justify-center gap-1 mx-auto">
+                <Lock size={12} /> Área Restrita
+              </button>
+            </footer>
           </div>
         )}
 
         {/* --- VISTA: CARRINHO --- */}
         {view === 'cart' && (
-          <div className="animate-in slide-in-from-right w-full max-w-4xl mx-auto">
+          <div className="animate-in slide-in-from-right w-full max-w-4xl mx-auto pb-20">
             <button onClick={() => setView('home')} className="flex items-center text-stone-500 hover:text-stone-800 mb-6 font-bold text-sm bg-white px-4 py-2 rounded-full shadow-sm w-fit border border-stone-200"><ChevronLeft size={18} className="mr-1"/> Adicionar mais itens</button>
             <h2 className="text-3xl font-extrabold text-stone-900 mb-6">Sua Cesta</h2>
             
@@ -582,7 +658,6 @@ export default function App() {
                     <div key={item.id} className="p-5 border-b border-stone-100 flex items-center justify-between gap-4 last:border-0 hover:bg-stone-50 transition-colors">
                       <div className="flex items-center gap-4 w-full sm:w-auto">
                         
-                        {/* CORREÇÃO AQUI: Suporte a foto no carrinho */}
                         <div className="w-20 h-20 bg-stone-100 rounded-2xl border border-stone-200 flex items-center justify-center flex-shrink-0 text-4xl overflow-hidden">
                           {item.imageUrl?.startsWith('http') ? <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" /> : item.imageUrl}
                         </div>
@@ -622,7 +697,7 @@ export default function App() {
 
         {/* --- VISTA: CHECKOUT (ACORDEÃO / STEPPER OTIMIZADO) --- */}
         {view === 'checkout' && (
-          <div className="animate-in slide-in-from-right w-full max-w-4xl mx-auto">
+          <div className="animate-in slide-in-from-right w-full max-w-4xl mx-auto pb-20">
             <button onClick={() => setView('cart')} className="flex items-center text-stone-500 hover:text-stone-800 mb-6 font-bold text-sm bg-white px-4 py-2 rounded-full shadow-sm w-fit border border-stone-200"><ChevronLeft size={18} className="mr-1"/> Voltar à cesta</button>
             <h2 className="text-3xl font-extrabold text-stone-900 mb-6">Finalização</h2>
             
@@ -702,7 +777,7 @@ export default function App() {
                   {checkoutStep > 3 && <div className="px-5 pb-5 sm:px-6 pt-0 text-sm font-bold text-stone-800 ml-11">Receber na {checkoutForm.deliveryDate}</div>}
                 </div>
 
-                {/* Passo 4: Pagamento (Submete o form real) */}
+                {/* Passo 4: Pagamento */}
                 <div className={`bg-white rounded-3xl border transition-all ${checkoutStep === 4 ? 'border-[#008c43] shadow-md ring-4 ring-[#e6f4ea]' : 'border-stone-200 shadow-sm opacity-90'}`}>
                   <div className="p-5 sm:p-6 flex justify-between items-center cursor-pointer">
                     <h3 className={`font-bold text-lg flex items-center gap-3 ${checkoutStep === 4 ? 'text-stone-800' : 'text-stone-400'}`}>
@@ -757,7 +832,7 @@ export default function App() {
 
         {/* --- VISTA: PEDIDOS DO CLIENTE E SUCESSO --- */}
         {view === 'orders' && !isAdmin && (
-          <div className="animate-in slide-in-from-right max-w-2xl mx-auto">
+          <div className="animate-in slide-in-from-right max-w-2xl mx-auto pb-20">
              <button onClick={() => setView('home')} className="flex items-center text-stone-500 hover:text-stone-800 mb-6 font-bold text-sm bg-white px-4 py-2 rounded-full shadow-sm w-fit border border-stone-200"><ChevronLeft size={18} className="mr-1" /> Voltar às compras</button>
             <h2 className="text-3xl font-extrabold text-stone-900 mb-8 flex items-center gap-3"><Package className="text-[#008c43]" size={32}/> Meus Pedidos</h2>
             {orders.length === 0 ? (
@@ -783,7 +858,7 @@ export default function App() {
         )}
 
         {view === 'success' && (
-          <div className="animate-in zoom-in max-w-md mx-auto text-center pt-20">
+          <div className="animate-in zoom-in max-w-md mx-auto text-center pt-20 pb-20">
             <div className="w-24 h-24 bg-[#008c43] text-white rounded-full flex items-center justify-center mx-auto mb-8 shadow-xl shadow-green-900/20"><CheckCircle2 size={48} /></div>
             <h2 className="text-3xl font-extrabold text-stone-900 mb-4">Pedido Realizado!</h2>
             <p className="text-stone-600 mb-10 text-lg font-medium">Tudo certo! Seus orgânicos fresquinhos serão entregues na próxima <strong>{checkoutForm.deliveryDate}</strong>.</p>
@@ -798,19 +873,6 @@ export default function App() {
           </div>
         )}
       </main>
-
-      {/* --- BOTÃO FLUTUANTE EXCLUSIVO PARA O DESENVOLVEDOR TESTAR --- */}
-      <div className="fixed bottom-6 left-6 z-50">
-        <button 
-          onClick={() => { const next = !isAdmin; setIsAdmin(next); setView(next ? 'admin' : 'home'); setIsSidebarOpen(false); }}
-          className="bg-stone-900 text-white w-12 h-12 flex items-center justify-center rounded-full shadow-2xl border border-stone-700 hover:scale-110 transition-transform tooltip group"
-        >
-          <ShieldCheck size={20} className="text-orange-400" />
-          <span className="absolute left-14 bg-stone-900 text-white text-xs font-bold px-3 py-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-            {isAdmin ? 'Sair do Admin' : 'Entrar no Admin'}
-          </span>
-        </button>
-      </div>
     </div>
   );
 }
