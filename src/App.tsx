@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ShoppingCart, Leaf, MapPin, Calendar, 
   CreditCard, Banknote, ChevronLeft, ChevronRight, Plus, Minus, CheckCircle2,
-  Store, Search, User, Package, Clock, Truck, ShieldCheck, Map, ListChecks, Tags, BarChart3, TrendingUp, Menu, X, Edit2, Lock, Trash2, ImagePlus, Loader2
+  Store, Search, User, Package, Clock, Truck, ShieldCheck, Map, ListChecks, Tags, BarChart3, TrendingUp, Menu, X, Edit2, Lock, Trash2, ImagePlus, Loader2, Zap
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, signInWithEmailAndPassword, signOut } from 'firebase/auth';
@@ -62,7 +62,7 @@ export default function App() {
   const [showNewProductForm, setShowNewProductForm] = useState(false);
   const [editingProductId, setEditingProductId] = useState(null);
   const [newProduct, setNewProduct] = useState({ name: '', price: '', unit: 'unidade', category: 'Verduras', imageUrl: '📦' });
-  const [imageFileName, setImageFileName] = useState(''); // Apenas para mostrar o nome do arquivo na UI
+  const [imageFileName, setImageFileName] = useState(''); 
 
   // Estados do Checkout
   const [checkoutStep, setCheckoutStep] = useState(1);
@@ -141,7 +141,20 @@ export default function App() {
   const cartTotal = useMemo(() => cart.reduce((sum, item) => sum + (item.price * item.qty), 0), [cart]);
   const cartItemsCount = useMemo(() => cart.reduce((sum, item) => sum + item.qty, 0), [cart]);
 
-  const categories = useMemo(() => ['Todos', ...new Set(products.map(p => p.category))], [products]);
+  const categories = useMemo(() => {
+    // Forçar ordem personalizada das categorias para não ficar alfabético
+    const order = ['Verduras', 'Legumes', 'Frutas', 'Cestas', 'Outros'];
+    const currentCats = [...new Set(products.map(p => p.category))];
+    const sortedCats = currentCats.sort((a, b) => {
+      let indexA = order.indexOf(a);
+      let indexB = order.indexOf(b);
+      indexA = indexA === -1 ? 99 : indexA;
+      indexB = indexB === -1 ? 99 : indexB;
+      return indexA - indexB;
+    });
+    return ['Todos', ...sortedCats];
+  }, [products]);
+  
   const displayedProducts = useMemo(() => products.filter(p => p.isActive && (selectedCategory === 'Todos' || p.category === selectedCategory)), [products, selectedCategory]);
 
   // --- INTELIGÊNCIA LOGÍSTICA E KPIS (ADMIN) ---
@@ -220,16 +233,15 @@ export default function App() {
     setIsProcessing(true);
 
     const reader = new FileReader();
-    reader.readAsDataURL(file); // Passo 2: Lê o arquivo
+    reader.readAsDataURL(file); // Lê o arquivo
     
     reader.onload = (event) => {
-      // Passo 3 extra: Criar uma imagem em memória para comprimir
       const img = new Image();
       img.src = event.target.result;
       
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 600; // Limita a largura para manter o Base64 pequeno (<1MB)
+        const MAX_WIDTH = 600; 
         const MAX_HEIGHT = 600;
         let width = img.width;
         let height = img.height;
@@ -245,10 +257,7 @@ export default function App() {
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Converte o canvas comprimido de volta para texto Base64 (Qualidade 0.7 = 70%)
-        const base64String = canvas.toDataURL('image/jpeg', 0.7);
-        
-        // Coloca o texto Base64 gigante dentro do estado do Produto
+        const base64String = canvas.toDataURL('image/jpeg', 0.7); // 70% quality
         setNewProduct(prev => ({ ...prev, imageUrl: base64String }));
         setIsProcessing(false);
       };
@@ -288,7 +297,6 @@ export default function App() {
     }
   };
 
-  // Preparar formulário para edição
   const handleEditProduct = (product) => {
     setNewProduct({
       name: product.name,
@@ -303,7 +311,6 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Eliminar Produto
   const handleDeleteProduct = async (productId) => {
     if (window.confirm("Tem a certeza que deseja eliminar este produto? Esta ação não pode ser desfeita.")) {
       try {
@@ -312,12 +319,93 @@ export default function App() {
     }
   };
 
-  // Limpar Formulário
   const handleCancelForm = () => {
     setShowNewProductForm(false);
     setEditingProductId(null);
     setImageFileName('');
     setNewProduct({ name: '', price: '', unit: 'unidade', category: 'Verduras', imageUrl: '📦' });
+  };
+
+  // --- IMPORTAÇÃO EM MASSA DO CATÁLOGO DO SR. IZAIAS ---
+  const handleImportMassCatalog = async () => {
+    if (!window.confirm("Deseja importar automaticamente a lista completa de 54 produtos do Sr. Izaias? ISSO PODE DEMORAR ALGUNS SEGUNDOS.")) return;
+    
+    setIsProcessing(true);
+    
+    const catalogoIzaias = [
+      { name: "Alface Americana", price: 5.00, unit: "maço", category: "Verduras", imageUrl: "🥬" },
+      { name: "Alface Crespa", price: 4.50, unit: "maço", category: "Verduras", imageUrl: "🥬" },
+      { name: "Alface Roxa", price: 4.50, unit: "maço", category: "Verduras", imageUrl: "🥬" },
+      { name: "Alface Lisa", price: 4.50, unit: "maço", category: "Verduras", imageUrl: "🥬" },
+      { name: "Agrião da Água", price: 7.00, unit: "maço", category: "Verduras", imageUrl: "🌿" },
+      { name: "Alho Poró", price: 6.00, unit: "unidade", category: "Verduras", imageUrl: "🧅" },
+      { name: "Couve", price: 6.00, unit: "maço", category: "Verduras", imageUrl: "🥬" },
+      { name: "Rúcula", price: 7.00, unit: "maço", category: "Verduras", imageUrl: "🌿" },
+      { name: "Espinafre", price: 7.00, unit: "maço", category: "Verduras", imageUrl: "🌿" },
+      { name: "Cheiro Verde", price: 5.00, unit: "maço", category: "Verduras", imageUrl: "🌿" },
+      { name: "Salsinha", price: 5.00, unit: "maço", category: "Verduras", imageUrl: "🌿" },
+      { name: "Coentro", price: 5.00, unit: "maço", category: "Verduras", imageUrl: "🌿" },
+      { name: "Jiló 500g", price: 6.00, unit: "pacote", category: "Legumes", imageUrl: "🫒" },
+      { name: "Inhame 500g", price: 6.00, unit: "pacote", category: "Legumes", imageUrl: "🥔" },
+      { name: "Gengibre 300g", price: 6.00, unit: "pacote", category: "Legumes", imageUrl: "🫚" },
+      { name: "Chuchu 800 a 900g", price: 7.00, unit: "unidade", category: "Legumes", imageUrl: "🍐" },
+      { name: "Pepino Japonês 500g", price: 6.00, unit: "pacote", category: "Legumes", imageUrl: "🥒" },
+      { name: "Cebola 550 a 600g", price: 5.00, unit: "pacote", category: "Legumes", imageUrl: "🧅" },
+      { name: "Cebola Roxa 550 a 600g", price: 7.00, unit: "pacote", category: "Legumes", imageUrl: "🧅" },
+      { name: "Limão Cravo 800g", price: 6.00, unit: "pacote", category: "Frutas", imageUrl: "🍋" },
+      { name: "Tomate Italiano", price: 14.00, unit: "kg", category: "Legumes", imageUrl: "🍅" },
+      { name: "Abobrinha Itália 700 a 800g", price: 8.00, unit: "unidade", category: "Legumes", imageUrl: "🥒" },
+      { name: "Berinjela 750 a 850g", price: 9.00, unit: "unidade", category: "Legumes", imageUrl: "🍆" },
+      { name: "Abóbora Cabotian", price: 7.00, unit: "kg", category: "Legumes", imageUrl: "🎃" },
+      { name: "Batata Doce Salmão", price: 12.00, unit: "kg", category: "Legumes", imageUrl: "🍠" },
+      { name: "Batata Doce Roxa", price: 10.00, unit: "kg", category: "Legumes", imageUrl: "🍠" },
+      { name: "Batata Doce Rosada", price: 8.00, unit: "kg", category: "Legumes", imageUrl: "🍠" },
+      { name: "Feijão Carioca", price: 15.00, unit: "kg", category: "Outros", imageUrl: "🫘" },
+      { name: "Feijão Fava Verde 500g", price: 20.00, unit: "pacote", category: "Outros", imageUrl: "🫛" },
+      { name: "Banana Nanica Verde", price: 13.00, unit: "dúzia", category: "Frutas", imageUrl: "🍌" },
+      { name: "Mandioca Limpa Congelada 700g", price: 7.00, unit: "pacote", category: "Legumes", imageUrl: "🥔" },
+      { name: "Maracujá Congelado 500g", price: 20.00, unit: "pacote", category: "Frutas", imageUrl: "🟡" },
+      { name: "Mel Silvestre 800g", price: 60.00, unit: "unidade", category: "Outros", imageUrl: "🍯" },
+      { name: "Ovos de Galinha Caipira", price: 19.00, unit: "dúzia", category: "Outros", imageUrl: "🥚" },
+      { name: "Queijo Fresco (Búfala) 500g", price: 25.00, unit: "unidade", category: "Outros", imageUrl: "🧀" },
+      { name: "Queijo Nozinho (Búfala) 500g", price: 35.00, unit: "unidade", category: "Outros", imageUrl: "🧀" },
+      { name: "Queijo Parmesão (Búfala) 500g", price: 35.00, unit: "unidade", category: "Outros", imageUrl: "🧀" },
+      { name: "Queijo Bola Seca (Búfala) 500g", price: 32.00, unit: "unidade", category: "Outros", imageUrl: "🧀" },
+      { name: "Queijo Mussarela (Búfala) 500g", price: 32.00, unit: "unidade", category: "Outros", imageUrl: "🧀" },
+      { name: "Doce de Leite Cremoso 300g", price: 15.00, unit: "unidade", category: "Outros", imageUrl: "🍮" },
+      { name: "Leite de Búfala 2 Litros", price: 15.00, unit: "unidade", category: "Outros", imageUrl: "🥛" },
+      { name: "Queijo Meia Cura (Vaca) 500g", price: 34.00, unit: "unidade", category: "Outros", imageUrl: "🧀" },
+      { name: "Queijo Parmesão (Vaca) 600g", price: 38.00, unit: "unidade", category: "Outros", imageUrl: "🧀" },
+      { name: "Queijo Nozinho (Vaca) 500g", price: 32.00, unit: "unidade", category: "Outros", imageUrl: "🧀" },
+      { name: "Queijo Nozinho Temperado (Vaca) 500g", price: 35.00, unit: "unidade", category: "Outros", imageUrl: "🧀" },
+      { name: "Queijo Parmesão ao Vinho (Vaca) 600g", price: 42.00, unit: "unidade", category: "Outros", imageUrl: "🧀" },
+      { name: "Manteiga 250g", price: 15.00, unit: "unidade", category: "Outros", imageUrl: "🧈" },
+      { name: "Goiabada Cascão 500g", price: 16.00, unit: "unidade", category: "Outros", imageUrl: "🥮" },
+      { name: "Geleia de Cambuci Artesanal 300g", price: 10.00, unit: "unidade", category: "Outros", imageUrl: "🫙" },
+      { name: "Açúcar Mascavo Artesanal 500g", price: 13.00, unit: "unidade", category: "Outros", imageUrl: "🟤" },
+      { name: "Farinha de Mandioca Artesanal 500g", price: 12.00, unit: "unidade", category: "Outros", imageUrl: "🥣" },
+      { name: "Melado de Cana Artesanal 420g", price: 12.00, unit: "unidade", category: "Outros", imageUrl: "🍯" },
+      { name: "Extrato de Cambuci Artesanal 1L", price: 30.00, unit: "litro", category: "Outros", imageUrl: "🍾" },
+      { name: "Cachaça Artesanal 1L", price: 18.00, unit: "litro", category: "Outros", imageUrl: "🍷" }
+    ];
+
+    try {
+      const batchPromises = catalogoIzaias.map(prod => 
+        addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), {
+          ...prod,
+          isActive: true,
+          updatedAt: new Date().toISOString()
+        })
+      );
+      
+      await Promise.all(batchPromises);
+      alert("Lista importada com sucesso!");
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao importar a lista.");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   // --- LÓGICA DE CHECKOUT E API ---
@@ -527,11 +615,16 @@ export default function App() {
                     <h3 className="text-lg font-bold text-stone-800">Catálogo de Produtos</h3>
                     <p className="text-sm text-stone-500">Gere a disponibilidade, edita ou cria novos.</p>
                   </div>
-                  {!showNewProductForm && (
-                    <button onClick={() => { setShowNewProductForm(true); setEditingProductId(null); setNewProduct({ name: '', price: '', unit: 'unidade', category: 'Verduras', imageUrl: '📦' }); setImageFileName(''); }} className="bg-[#008c43] text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#007035]">
-                      <Plus size={18}/> Novo Produto
+                  <div className="flex gap-2 w-full sm:w-auto">
+                    <button onClick={handleImportMassCatalog} disabled={isProcessing} className="flex-1 bg-yellow-500 text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-yellow-600 disabled:opacity-50">
+                      {isProcessing ? <Loader2 size={18} className="animate-spin" /> : <Zap size={18} />} Importar Base
                     </button>
-                  )}
+                    {!showNewProductForm && (
+                      <button onClick={() => { setShowNewProductForm(true); setEditingProductId(null); setNewProduct({ name: '', price: '', unit: 'unidade', category: 'Verduras', imageUrl: '📦' }); setImageFileName(''); }} className="flex-1 bg-[#008c43] text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#007035]">
+                        <Plus size={18}/> Novo
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {showNewProductForm && (
@@ -573,7 +666,7 @@ export default function App() {
                         <div><label className="block text-sm font-bold text-green-800 mb-1">Preço (R$)</label><input required type="number" step="0.01" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Ex: 4.50" /></div>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div><label className="block text-sm font-bold text-green-800 mb-1">Unidade</label><select value={newProduct.unit} onChange={e => setNewProduct({...newProduct, unit: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl bg-white"><option value="maço">Maço</option><option value="kg">Quilo (kg)</option><option value="unidade">Unidade</option><option value="bandeja">Bandeja</option></select></div>
+                        <div><label className="block text-sm font-bold text-green-800 mb-1">Unidade</label><select value={newProduct.unit} onChange={e => setNewProduct({...newProduct, unit: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl bg-white"><option value="maço">Maço</option><option value="kg">Quilo (kg)</option><option value="unidade">Unidade</option><option value="pacote">Pacote</option><option value="dúzia">Dúzia</option><option value="litro">Litro</option></select></div>
                         <div><label className="block text-sm font-bold text-green-800 mb-1">Categoria</label><select value={newProduct.category} onChange={e => setNewProduct({...newProduct, category: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl bg-white"><option value="Verduras">Verduras</option><option value="Legumes">Legumes</option><option value="Frutas">Frutas</option><option value="Cestas">Cestas</option><option value="Outros">Outros</option></select></div>
                       </div>
                       <div className="flex flex-col sm:flex-row gap-3 mt-4">
@@ -1010,6 +1103,7 @@ export default function App() {
           </div>
         )}
 
+        {/* --- VISTA: SUCESSO --- */}
         {view === 'success' && (
           <div className="animate-in zoom-in max-w-md mx-auto text-center pt-20 pb-20">
             <div className="w-24 h-24 bg-[#008c43] text-white rounded-full flex items-center justify-center mx-auto mb-8 shadow-xl shadow-green-900/20"><CheckCircle2 size={48} /></div>
