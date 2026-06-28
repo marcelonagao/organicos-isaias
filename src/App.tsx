@@ -552,7 +552,7 @@ export default function App() {
         {/* Sidebar (Menu Lateral) */}
         <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 fixed md:static top-0 left-0 h-full w-64 bg-stone-900 text-stone-300 transition-transform duration-300 z-40 flex flex-col`}>
           <div className="h-16 flex items-center px-6 bg-stone-950 font-bold text-white tracking-wide border-b border-stone-800">
-            <Leaf size={20} className="text-[#00a650] mr-2" /> Orgânicos Izaias
+            <Leaf size={20} className="text-[#00a650] mr-2" /> Orgânicos Isaias
           </div>
           
           <div className="p-4">
@@ -877,7 +877,7 @@ export default function App() {
         <header className="bg-[#005e33] text-white p-4 shadow-sm">
           <div className="container mx-auto flex items-center gap-2 cursor-pointer max-w-5xl" onClick={() => setView('home')}>
             <Leaf size={24} />
-            <h1 className="text-lg font-semibold tracking-tight">Clube Orgânicos Izaias</h1>
+            <h1 className="text-lg font-semibold tracking-tight">Clube Orgânicos Isaias</h1>
           </div>
         </header>
 
@@ -930,7 +930,7 @@ export default function App() {
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView('home')}>
               <Leaf size={24} />
-              <h1 className="text-lg font-semibold tracking-tight">Clube Orgânicos Izaias</h1>
+              <h1 className="text-lg font-semibold tracking-tight">Clube Orgânicos Isaias</h1>
             </div>
             <div onClick={() => setView('orders')} className="bg-white/10 px-3 py-1.5 rounded-full flex items-center gap-2 cursor-pointer hover:bg-white/20 transition-colors border border-white/10">
               <Package size={16} /> <span className="text-sm font-medium">Meus Pedidos</span>
@@ -1043,7 +1043,7 @@ export default function App() {
 
             {/* Rodapé e Link de Admin */}
             <footer className="mt-16 py-8 text-center text-stone-400 text-xs border-t border-stone-200 w-full">
-              <p>© {new Date().getFullYear()} Clube Orgânicos Izaias. Todos os direitos reservados.</p>
+              <p>© {new Date().getFullYear()} Clube Orgânicos Isaias. Todos os direitos reservados.</p>
               <button onClick={() => setView('adminLogin')} className="mt-4 hover:text-stone-600 transition-colors flex items-center justify-center gap-1 mx-auto">
                 <Lock size={12} /> Área Restrita
               </button>
