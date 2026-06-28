@@ -1236,7 +1236,7 @@ export default function App() {
         )}
 
         {/* --- VISTA: PEDIDOS DO CLIENTE E SUCESSO --- */}
-        {view === 'orders' && !isAdmin && (
+        {view === 'orders' && (
           <div className="animate-in slide-in-from-right max-w-2xl mx-auto pb-20">
              <button onClick={() => setView('home')} className="flex items-center text-stone-500 hover:text-stone-800 mb-6 font-bold text-sm bg-white px-4 py-2 rounded-full shadow-sm w-fit border border-stone-200"><ChevronLeft size={18} className="mr-1" /> Voltar às compras</button>
             <h2 className="text-3xl font-extrabold text-stone-900 mb-8 flex items-center gap-3"><Package className="text-[#008c43]" size={32}/> Meus Pedidos</h2>
