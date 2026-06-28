@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ShoppingCart, Leaf, MapPin, Calendar, 
   CreditCard, Banknote, ChevronLeft, ChevronRight, Plus, Minus, CheckCircle2,
-  Store, Search, User, Package, Clock, Truck, ShieldCheck, Map, ListChecks, Tags, BarChart3, TrendingUp, Menu, X, Edit2, Lock, Trash2, ImagePlus, Loader2, Download, Upload, AlertCircle, Zap
+  Store, Search, User, Package, Clock, Truck, ShieldCheck, Map, ListChecks, Tags, BarChart3, TrendingUp, Menu, X, Edit2, Lock, Trash2, ImagePlus, Loader2, Download, Upload, AlertCircle, Database
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, signInWithEmailAndPassword, signOut } from 'firebase/auth';
@@ -122,13 +122,14 @@ export default function App() {
           setAdminDateFilter(prev => prev || activeDays[0].dayOfWeek); 
         }
       } else {
+        // Inicializar com as regras exatas do Sr. Izaias
         const defaultSettings = {
           isOpen: true,
           minimumOrderValue: 30, // Pedido mínimo de 30 reais
           cutoffMessage: "Pedidos da semana encerram Segunda-feira às 19h!",
           deliveryDays: [
-            { dayOfWeek: "Terça-feira (Porto Novo até Martins de Sá)", active: true },
-            { dayOfWeek: "Quarta-feira (Getúba até Tabatinga)", active: true }
+            { dayOfWeek: "Terça-feira após 16h (Porto Novo a Martins de Sá)", active: true },
+            { dayOfWeek: "Quarta-feira após 8h (Getúba a Tabatinga)", active: true }
           ]
         };
         await setDoc(doc(settingsRef, 'store_config'), defaultSettings);
@@ -153,7 +154,7 @@ export default function App() {
   const cartTotal = useMemo(() => cart.reduce((sum, item) => sum + (item.price * item.qty), 0), [cart]);
   const cartItemsCount = useMemo(() => cart.reduce((sum, item) => sum + item.qty, 0), [cart]);
   
-  // Regras de Negócio
+  // Regras de Negócio: Mínimo 30 reais
   const minOrderValue = settings?.minimumOrderValue || 30;
   const isMinOrderMet = cartTotal >= minOrderValue;
 
@@ -227,6 +228,18 @@ export default function App() {
   const handleAdminLogout = async () => {
     await signOut(auth);
     setView('home');
+  };
+
+  // Botão de Pânico: Abrir/Fechar Loja (Segunda 19h)
+  const toggleStoreStatus = async () => {
+    if (!settings) return;
+    try {
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'store_config'), {
+        isOpen: !settings.isOpen
+      });
+    } catch (error) {
+      console.error("Erro ao alterar status da loja", error);
+    }
   };
 
   const updateOrderStatus = async (orderId, newStatus) => {
@@ -321,7 +334,6 @@ export default function App() {
     setImageFileName(''); 
     setEditingProductId(product.id);
     setShowNewProductForm(true);
-    // Removido o window.scrollTo para a tela não subir abruptamente!
   };
 
   const handleDeleteProduct = async (productId) => {
@@ -566,7 +578,23 @@ export default function App() {
             {/* Abas de Conteúdo */}
             {adminTab === 'dashboard' && (
               <div className="space-y-6 animate-in fade-in">
-                <h2 className="text-2xl font-bold text-stone-800 mb-6">Visão Geral</h2>
+                
+                {/* BOTÃO DE PÂNICO: ABRIR E FECHAR LOJA */}
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-stone-800 flex items-center gap-2">
+                      <Store size={20} className={settings?.isOpen ? 'text-green-600' : 'text-red-600'} /> Status da Loja
+                    </h3>
+                    <p className="text-sm text-stone-500 mt-1">Ao chegar Segunda-feira às 19h, feche a loja aqui para bloquear novos pedidos.</p>
+                  </div>
+                  <button
+                    onClick={toggleStoreStatus}
+                    className={`px-6 py-3 rounded-xl font-bold text-white transition-colors w-full sm:w-auto shadow-sm ${settings?.isOpen ? 'bg-red-500 hover:bg-red-600' : 'bg-[#008c43] hover:bg-[#007035]'}`}
+                  >
+                    {settings?.isOpen ? 'Encerrar Pedidos da Semana' : 'Reabrir Loja para Pedidos'}
+                  </button>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200 flex items-center gap-5">
                     <div className="bg-green-100 p-5 rounded-full text-green-700"><TrendingUp size={28} /></div>
@@ -578,7 +606,7 @@ export default function App() {
                   </div>
                 </div>
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200">
-                  <h3 className="text-lg font-bold text-stone-800 mb-4 border-b pb-3">Vendas por Cidade</h3>
+                  <h3 className="text-lg font-bold text-stone-800 mb-4 border-b pb-3">Vendas por Bairro / Cidade</h3>
                   {Object.keys(dashboardKPIs.citySales).length === 0 ? <p className="text-stone-500 text-sm">Sem dados suficientes.</p> : (
                     <div className="space-y-3">
                       {Object.entries(dashboardKPIs.citySales).sort((a, b) => b[1] - a[1]).map(([city, count]) => (
@@ -649,6 +677,7 @@ export default function App() {
                     <p className="text-sm text-stone-500">Faça a gestão em massa via Excel ou edite individualmente.</p>
                   </div>
                   <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                    
                     <button onClick={handleExportCSV} disabled={isProcessing} className="flex-1 min-w-[140px] bg-stone-800 text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-stone-700 transition-colors disabled:opacity-50">
                       <Download size={18} /> Exportar CSV
                     </button>
@@ -658,9 +687,11 @@ export default function App() {
                       <input type="file" accept=".csv" className="hidden" onChange={handleImportCSV} disabled={isProcessing} />
                     </label>
 
-                    <button onClick={() => { setShowNewProductForm(true); setEditingProductId(null); setNewProduct({ name: '', price: '', unit: 'unidade', category: 'Verduras', imageUrl: '📦' }); setImageFileName(''); }} className="flex-1 min-w-[140px] bg-[#008c43] text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#007035]">
-                      <Plus size={18}/> Novo Produto
-                    </button>
+                    {!showNewProductForm && (
+                      <button onClick={() => { setShowNewProductForm(true); setEditingProductId(null); setNewProduct({ name: '', price: '', unit: 'unidade', category: 'Verduras', imageUrl: '📦' }); setImageFileName(''); }} className="flex-1 min-w-[140px] bg-[#008c43] text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#007035]">
+                        <Plus size={18}/> Novo Produto
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -722,7 +753,7 @@ export default function App() {
                             <div><label className="block text-sm font-bold text-green-800 mb-1">Categoria</label><select value={newProduct.category} onChange={e => setNewProduct({...newProduct, category: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl bg-white"><option value="Verduras">Verduras</option><option value="Legumes">Legumes</option><option value="Frutas">Frutas</option><option value="Laticínios">Laticínios</option><option value="Mercearia">Mercearia</option><option value="Cestas">Cestas</option><option value="Outros">Outros</option></select></div>
                           </div>
                           <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-green-200 mt-6">
-                            <button type="submit" disabled={isProcessing} className="bg-[#007035] text-white px-8 py-4 rounded-xl font-bold w-full md:w-auto hover:bg-green-800 transition-colors disabled:bg-stone-400 flex items-center justify-center gap-2 text-lg">
+                            <button type="submit" disabled={isProcessing} className="bg-[#008c43] text-white px-8 py-4 rounded-xl font-bold w-full md:w-auto hover:bg-green-800 transition-colors disabled:bg-stone-400 flex items-center justify-center gap-2 text-lg">
                               {isProcessing && <Loader2 size={20} className="animate-spin" />}
                               {isProcessing ? 'A carregar...' : (editingProductId ? 'Atualizar Produto' : 'Guardar no Catálogo')}
                             </button>
