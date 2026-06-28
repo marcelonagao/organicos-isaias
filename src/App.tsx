@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ShoppingCart, Leaf, MapPin, Calendar, 
   CreditCard, Banknote, ChevronLeft, ChevronRight, Plus, Minus, CheckCircle2,
-  Store, Search, User, Package, Clock, Truck, ShieldCheck, Map, ListChecks, Tags, BarChart3, TrendingUp, Menu, X, Edit2, Lock, Trash2, ImagePlus, Loader2, Download, Upload, AlertCircle, Zap
+  Store, Search, User, Package, Clock, Truck, ShieldCheck, Map, ListChecks, Tags, BarChart3, TrendingUp, Menu, X, Edit2, Lock, Trash2, ImagePlus, Loader2, Download, Upload, AlertCircle
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, signInWithEmailAndPassword, signOut } from 'firebase/auth';
@@ -340,92 +340,6 @@ export default function App() {
     setNewProduct({ name: '', price: '', unit: 'unidade', category: 'Verduras', imageUrl: '📦' });
   };
 
-  const handleImportMassCatalog = async () => {
-    if (!window.confirm("Deseja importar automaticamente a lista completa de produtos do Sr. Izaias? ISSO PODE DEMORAR ALGUNS SEGUNDOS.")) return;
-    
-    setIsProcessing(true);
-    
-    // Lista refinada e categorizada corretamente
-    const catalogoIzaias = [
-      { name: "Alface Americana", price: 5.00, unit: "maço", category: "Verduras", imageUrl: "🥬" },
-      { name: "Alface Crespa", price: 4.50, unit: "maço", category: "Verduras", imageUrl: "🥬" },
-      { name: "Alface Roxa", price: 4.50, unit: "maço", category: "Verduras", imageUrl: "🥬" },
-      { name: "Alface Lisa", price: 4.50, unit: "maço", category: "Verduras", imageUrl: "🥬" },
-      { name: "Agrião da Água", price: 7.00, unit: "maço", category: "Verduras", imageUrl: "🌿" },
-      { name: "Alho Poró", price: 6.00, unit: "unidade", category: "Verduras", imageUrl: "🧅" },
-      { name: "Couve", price: 6.00, unit: "maço", category: "Verduras", imageUrl: "🥬" },
-      { name: "Rúcula", price: 7.00, unit: "maço", category: "Verduras", imageUrl: "🌿" },
-      { name: "Espinafre", price: 7.00, unit: "maço", category: "Verduras", imageUrl: "🌿" },
-      { name: "Cheiro Verde", price: 5.00, unit: "maço", category: "Verduras", imageUrl: "🌿" },
-      { name: "Salsinha", price: 5.00, unit: "maço", category: "Verduras", imageUrl: "🌿" },
-      { name: "Coentro", price: 5.00, unit: "maço", category: "Verduras", imageUrl: "🌿" },
-      { name: "Jiló 500g", price: 6.00, unit: "pacote", category: "Legumes", imageUrl: "🫒" },
-      { name: "Inhame 500g", price: 6.00, unit: "pacote", category: "Legumes", imageUrl: "🥔" },
-      { name: "Gengibre 300g", price: 6.00, unit: "pacote", category: "Legumes", imageUrl: "🫚" },
-      { name: "Chuchu 800 a 900g", price: 7.00, unit: "unidade", category: "Legumes", imageUrl: "🍐" },
-      { name: "Pepino Japonês 500g", price: 6.00, unit: "pacote", category: "Legumes", imageUrl: "🥒" },
-      { name: "Cebola 550 a 600g", price: 5.00, unit: "pacote", category: "Legumes", imageUrl: "🧅" },
-      { name: "Cebola Roxa 550 a 600g", price: 7.00, unit: "pacote", category: "Legumes", imageUrl: "🧅" },
-      { name: "Limão Cravo 800g", price: 6.00, unit: "pacote", category: "Frutas", imageUrl: "🍋" },
-      { name: "Tomate Italiano", price: 14.00, unit: "kg", category: "Legumes", imageUrl: "🍅" },
-      { name: "Abobrinha Itália 700 a 800g", price: 8.00, unit: "unidade", category: "Legumes", imageUrl: "🥒" },
-      { name: "Berinjela 750 a 850g", price: 9.00, unit: "unidade", category: "Legumes", imageUrl: "🍆" },
-      { name: "Abóbora Cabotian", price: 7.00, unit: "kg", category: "Legumes", imageUrl: "🎃" },
-      { name: "Batata Doce Salmão", price: 12.00, unit: "kg", category: "Legumes", imageUrl: "🍠" },
-      { name: "Batata Doce Roxa", price: 10.00, unit: "kg", category: "Legumes", imageUrl: "🍠" },
-      { name: "Batata Doce Rosada", price: 8.00, unit: "kg", category: "Legumes", imageUrl: "🍠" },
-      { name: "Mandioca Limpa Congelada 700g", price: 7.00, unit: "pacote", category: "Legumes", imageUrl: "🥔" },
-      { name: "Banana Nanica Verde", price: 13.00, unit: "dúzia", category: "Frutas", imageUrl: "🍌" },
-      { name: "Maracujá Congelado 500g", price: 20.00, unit: "pacote", category: "Frutas", imageUrl: "🟡" },
-      
-      // Mercearia e Diversos
-      { name: "Feijão Carioca", price: 15.00, unit: "kg", category: "Mercearia", imageUrl: "🫘" },
-      { name: "Feijão Fava Verde 500g", price: 20.00, unit: "pacote", category: "Mercearia", imageUrl: "🫛" },
-      { name: "Mel Silvestre 800g", price: 60.00, unit: "unidade", category: "Mercearia", imageUrl: "🍯" },
-      { name: "Ovos de Galinha Caipira", price: 19.00, unit: "dúzia", category: "Mercearia", imageUrl: "🥚" },
-      { name: "Goiabada Cascão 500g", price: 16.00, unit: "unidade", category: "Mercearia", imageUrl: "🥮" },
-      { name: "Geleia de Cambuci Artesanal 300g", price: 10.00, unit: "unidade", category: "Mercearia", imageUrl: "🫙" },
-      { name: "Açúcar Mascavo Artesanal 500g", price: 13.00, unit: "unidade", category: "Mercearia", imageUrl: "🟤" },
-      { name: "Farinha de Mandioca Artesanal 500g", price: 12.00, unit: "unidade", category: "Mercearia", imageUrl: "🥣" },
-      { name: "Melado de Cana Artesanal 420g", price: 12.00, unit: "unidade", category: "Mercearia", imageUrl: "🍯" },
-      { name: "Extrato de Cambuci Artesanal 1L", price: 30.00, unit: "litro", category: "Mercearia", imageUrl: "🍾" },
-      { name: "Cachaça Artesanal 1L", price: 18.00, unit: "litro", category: "Mercearia", imageUrl: "🍷" },
-
-      // Laticínios
-      { name: "Queijo Fresco (Búfala) 500g", price: 25.00, unit: "unidade", category: "Laticínios", imageUrl: "🧀" },
-      { name: "Queijo Nozinho (Búfala) 500g", price: 35.00, unit: "unidade", category: "Laticínios", imageUrl: "🧀" },
-      { name: "Queijo Parmesão (Búfala) 500g", price: 35.00, unit: "unidade", category: "Laticínios", imageUrl: "🧀" },
-      { name: "Queijo Bola Seca (Búfala) 500g", price: 32.00, unit: "unidade", category: "Laticínios", imageUrl: "🧀" },
-      { name: "Queijo Mussarela (Búfala) 500g", price: 32.00, unit: "unidade", category: "Laticínios", imageUrl: "🧀" },
-      { name: "Doce de Leite Cremoso 300g", price: 15.00, unit: "unidade", category: "Laticínios", imageUrl: "🍮" },
-      { name: "Leite de Búfala 2 Litros", price: 15.00, unit: "unidade", category: "Laticínios", imageUrl: "🥛" },
-      { name: "Queijo Meia Cura (Vaca) 500g", price: 34.00, unit: "unidade", category: "Laticínios", imageUrl: "🧀" },
-      { name: "Queijo Parmesão (Vaca) 600g", price: 38.00, unit: "unidade", category: "Laticínios", imageUrl: "🧀" },
-      { name: "Queijo Nozinho (Vaca) 500g", price: 32.00, unit: "unidade", category: "Laticínios", imageUrl: "🧀" },
-      { name: "Queijo Nozinho Temperado (Vaca) 500g", price: 35.00, unit: "unidade", category: "Laticínios", imageUrl: "🧀" },
-      { name: "Queijo Parmesão ao Vinho (Vaca) 600g", price: 42.00, unit: "unidade", category: "Laticínios", imageUrl: "🧀" },
-      { name: "Manteiga 250g", price: 15.00, unit: "unidade", category: "Laticínios", imageUrl: "🧈" }
-    ];
-
-    try {
-      const batchPromises = catalogoIzaias.map(prod => 
-        addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), {
-          ...prod,
-          isActive: true,
-          updatedAt: new Date().toISOString()
-        })
-      );
-      
-      await Promise.all(batchPromises);
-      alert("Lista importada e categorizada com sucesso!");
-    } catch (error) {
-      console.error(error);
-      alert("Erro ao importar a lista.");
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
   // --- EXPORTAÇÃO E IMPORTAÇÃO DE CSV ---
   const handleExportCSV = () => {
     const headers = ['id', 'name', 'price', 'unit', 'category', 'isActive', 'imageUrl'];
@@ -737,10 +651,6 @@ export default function App() {
                   </div>
                   <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                     
-                    <button onClick={handleImportMassCatalog} disabled={isProcessing} className="flex-1 min-w-[140px] bg-yellow-500 text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-yellow-600 transition-colors disabled:opacity-50">
-                      {isProcessing ? <Loader2 size={18} className="animate-spin" /> : <Zap size={18} />} Importar Base
-                    </button>
-
                     <button onClick={handleExportCSV} disabled={isProcessing} className="flex-1 min-w-[140px] bg-stone-800 text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-stone-700 transition-colors disabled:opacity-50">
                       <Download size={18} /> Exportar CSV
                     </button>
