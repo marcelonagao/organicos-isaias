@@ -142,7 +142,8 @@ export default function App() {
   const cartItemsCount = useMemo(() => cart.reduce((sum, item) => sum + item.qty, 0), [cart]);
 
   const categories = useMemo(() => {
-    const order = ['Verduras', 'Legumes', 'Frutas', 'Cestas', 'Outros'];
+    // Nova ordem lógica incluindo Laticínios e Mercearia
+    const order = ['Verduras', 'Legumes', 'Frutas', 'Laticínios', 'Mercearia', 'Cestas', 'Outros'];
     const currentCats = [...new Set(products.map(p => p.category))];
     const sortedCats = currentCats.sort((a, b) => {
       let indexA = order.indexOf(a);
@@ -323,13 +324,98 @@ export default function App() {
     setNewProduct({ name: '', price: '', unit: 'unidade', category: 'Verduras', imageUrl: '📦' });
   };
 
-  // --- NOVO: EXPORTAÇÃO E IMPORTAÇÃO DE CSV ---
+  const handleImportMassCatalog = async () => {
+    if (!window.confirm("Deseja importar automaticamente a lista completa de produtos do Sr. Izaias? ISSO PODE DEMORAR ALGUNS SEGUNDOS.")) return;
+    
+    setIsProcessing(true);
+    
+    // Lista refinada e categorizada corretamente
+    const catalogoIzaias = [
+      { name: "Alface Americana", price: 5.00, unit: "maço", category: "Verduras", imageUrl: "🥬" },
+      { name: "Alface Crespa", price: 4.50, unit: "maço", category: "Verduras", imageUrl: "🥬" },
+      { name: "Alface Roxa", price: 4.50, unit: "maço", category: "Verduras", imageUrl: "🥬" },
+      { name: "Alface Lisa", price: 4.50, unit: "maço", category: "Verduras", imageUrl: "🥬" },
+      { name: "Agrião da Água", price: 7.00, unit: "maço", category: "Verduras", imageUrl: "🌿" },
+      { name: "Alho Poró", price: 6.00, unit: "unidade", category: "Verduras", imageUrl: "🧅" },
+      { name: "Couve", price: 6.00, unit: "maço", category: "Verduras", imageUrl: "🥬" },
+      { name: "Rúcula", price: 7.00, unit: "maço", category: "Verduras", imageUrl: "🌿" },
+      { name: "Espinafre", price: 7.00, unit: "maço", category: "Verduras", imageUrl: "🌿" },
+      { name: "Cheiro Verde", price: 5.00, unit: "maço", category: "Verduras", imageUrl: "🌿" },
+      { name: "Salsinha", price: 5.00, unit: "maço", category: "Verduras", imageUrl: "🌿" },
+      { name: "Coentro", price: 5.00, unit: "maço", category: "Verduras", imageUrl: "🌿" },
+      { name: "Jiló 500g", price: 6.00, unit: "pacote", category: "Legumes", imageUrl: "🫒" },
+      { name: "Inhame 500g", price: 6.00, unit: "pacote", category: "Legumes", imageUrl: "🥔" },
+      { name: "Gengibre 300g", price: 6.00, unit: "pacote", category: "Legumes", imageUrl: "🫚" },
+      { name: "Chuchu 800 a 900g", price: 7.00, unit: "unidade", category: "Legumes", imageUrl: "🍐" },
+      { name: "Pepino Japonês 500g", price: 6.00, unit: "pacote", category: "Legumes", imageUrl: "🥒" },
+      { name: "Cebola 550 a 600g", price: 5.00, unit: "pacote", category: "Legumes", imageUrl: "🧅" },
+      { name: "Cebola Roxa 550 a 600g", price: 7.00, unit: "pacote", category: "Legumes", imageUrl: "🧅" },
+      { name: "Limão Cravo 800g", price: 6.00, unit: "pacote", category: "Frutas", imageUrl: "🍋" },
+      { name: "Tomate Italiano", price: 14.00, unit: "kg", category: "Legumes", imageUrl: "🍅" },
+      { name: "Abobrinha Itália 700 a 800g", price: 8.00, unit: "unidade", category: "Legumes", imageUrl: "🥒" },
+      { name: "Berinjela 750 a 850g", price: 9.00, unit: "unidade", category: "Legumes", imageUrl: "🍆" },
+      { name: "Abóbora Cabotian", price: 7.00, unit: "kg", category: "Legumes", imageUrl: "🎃" },
+      { name: "Batata Doce Salmão", price: 12.00, unit: "kg", category: "Legumes", imageUrl: "🍠" },
+      { name: "Batata Doce Roxa", price: 10.00, unit: "kg", category: "Legumes", imageUrl: "🍠" },
+      { name: "Batata Doce Rosada", price: 8.00, unit: "kg", category: "Legumes", imageUrl: "🍠" },
+      { name: "Mandioca Limpa Congelada 700g", price: 7.00, unit: "pacote", category: "Legumes", imageUrl: "🥔" },
+      { name: "Banana Nanica Verde", price: 13.00, unit: "dúzia", category: "Frutas", imageUrl: "🍌" },
+      { name: "Maracujá Congelado 500g", price: 20.00, unit: "pacote", category: "Frutas", imageUrl: "🟡" },
+      
+      // Mercearia e Diversos
+      { name: "Feijão Carioca", price: 15.00, unit: "kg", category: "Mercearia", imageUrl: "🫘" },
+      { name: "Feijão Fava Verde 500g", price: 20.00, unit: "pacote", category: "Mercearia", imageUrl: "🫛" },
+      { name: "Mel Silvestre 800g", price: 60.00, unit: "unidade", category: "Mercearia", imageUrl: "🍯" },
+      { name: "Ovos de Galinha Caipira", price: 19.00, unit: "dúzia", category: "Mercearia", imageUrl: "🥚" },
+      { name: "Goiabada Cascão 500g", price: 16.00, unit: "unidade", category: "Mercearia", imageUrl: "🥮" },
+      { name: "Geleia de Cambuci Artesanal 300g", price: 10.00, unit: "unidade", category: "Mercearia", imageUrl: "🫙" },
+      { name: "Açúcar Mascavo Artesanal 500g", price: 13.00, unit: "unidade", category: "Mercearia", imageUrl: "🟤" },
+      { name: "Farinha de Mandioca Artesanal 500g", price: 12.00, unit: "unidade", category: "Mercearia", imageUrl: "🥣" },
+      { name: "Melado de Cana Artesanal 420g", price: 12.00, unit: "unidade", category: "Mercearia", imageUrl: "🍯" },
+      { name: "Extrato de Cambuci Artesanal 1L", price: 30.00, unit: "litro", category: "Mercearia", imageUrl: "🍾" },
+      { name: "Cachaça Artesanal 1L", price: 18.00, unit: "litro", category: "Mercearia", imageUrl: "🍷" },
+
+      // Laticínios
+      { name: "Queijo Fresco (Búfala) 500g", price: 25.00, unit: "unidade", category: "Laticínios", imageUrl: "🧀" },
+      { name: "Queijo Nozinho (Búfala) 500g", price: 35.00, unit: "unidade", category: "Laticínios", imageUrl: "🧀" },
+      { name: "Queijo Parmesão (Búfala) 500g", price: 35.00, unit: "unidade", category: "Laticínios", imageUrl: "🧀" },
+      { name: "Queijo Bola Seca (Búfala) 500g", price: 32.00, unit: "unidade", category: "Laticínios", imageUrl: "🧀" },
+      { name: "Queijo Mussarela (Búfala) 500g", price: 32.00, unit: "unidade", category: "Laticínios", imageUrl: "🧀" },
+      { name: "Doce de Leite Cremoso 300g", price: 15.00, unit: "unidade", category: "Laticínios", imageUrl: "🍮" },
+      { name: "Leite de Búfala 2 Litros", price: 15.00, unit: "unidade", category: "Laticínios", imageUrl: "🥛" },
+      { name: "Queijo Meia Cura (Vaca) 500g", price: 34.00, unit: "unidade", category: "Laticínios", imageUrl: "🧀" },
+      { name: "Queijo Parmesão (Vaca) 600g", price: 38.00, unit: "unidade", category: "Laticínios", imageUrl: "🧀" },
+      { name: "Queijo Nozinho (Vaca) 500g", price: 32.00, unit: "unidade", category: "Laticínios", imageUrl: "🧀" },
+      { name: "Queijo Nozinho Temperado (Vaca) 500g", price: 35.00, unit: "unidade", category: "Laticínios", imageUrl: "🧀" },
+      { name: "Queijo Parmesão ao Vinho (Vaca) 600g", price: 42.00, unit: "unidade", category: "Laticínios", imageUrl: "🧀" },
+      { name: "Manteiga 250g", price: 15.00, unit: "unidade", category: "Laticínios", imageUrl: "🧈" }
+    ];
+
+    try {
+      const batchPromises = catalogoIzaias.map(prod => 
+        addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), {
+          ...prod,
+          isActive: true,
+          updatedAt: new Date().toISOString()
+        })
+      );
+      
+      await Promise.all(batchPromises);
+      alert("Lista importada e categorizada com sucesso!");
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao importar a lista.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // --- EXPORTAÇÃO E IMPORTAÇÃO DE CSV ---
   const handleExportCSV = () => {
     const headers = ['id', 'name', 'price', 'unit', 'category', 'isActive', 'imageUrl'];
     const csvContent = [
-      headers.join(';'), // Usamos ; porque no Brasil o Excel costuma abrir melhor assim
+      headers.join(';'), 
       ...products.map(p => {
-        // Remove quebras de linha e protege os textos com aspas
         return [
           p.id,
           `"${p.name}"`,
@@ -370,7 +456,6 @@ export default function App() {
         const rows = text.split('\n').filter(row => row.trim() !== '');
         if (rows.length < 2) throw new Error("O ficheiro CSV está vazio ou inválido.");
 
-        // Detectar separador (vírgula ou ponto e vírgula)
         const separator = rows[0].includes(';') ? ';' : ',';
         const headers = rows[0].split(separator).map(h => h.trim().replace(/"/g, ''));
 
@@ -387,7 +472,6 @@ export default function App() {
         const batchPromises = [];
 
         for (let i = 1; i < rows.length; i++) {
-          // Limpeza básica da linha, ignorando aspas
           const cleanRow = rows[i].split(separator).map(val => val.replace(/^"|"$/g, '').trim());
 
           const id = idIdx !== -1 ? cleanRow[idIdx] : null;
@@ -396,7 +480,6 @@ export default function App() {
           
           if (!name || !priceStr) continue;
 
-          // Tratamento para aceitar preços com vírgula (formato brasileiro)
           priceStr = priceStr.replace(',', '.');
           const price = parseFloat(priceStr);
 
@@ -407,17 +490,8 @@ export default function App() {
           const isActive = activeIdx !== -1 ? (cleanRow[activeIdx].toLowerCase() === 'true') : true;
           const imageUrl = imgIdx !== -1 && cleanRow[imgIdx] ? cleanRow[imgIdx] : '📦';
 
-          const productData = {
-            name,
-            price,
-            unit,
-            category,
-            isActive,
-            imageUrl,
-            updatedAt: new Date().toISOString()
-          };
+          const productData = { name, price, unit, category, isActive, imageUrl, updatedAt: new Date().toISOString() };
 
-          // Se tiver ID válido, atualiza. Se não, cria um novo.
           if (id && id.length > 5) {
             batchPromises.push(updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', id), productData));
           } else {
@@ -432,7 +506,7 @@ export default function App() {
         alert("Erro ao importar CSV: " + error.message);
       } finally {
         setIsProcessing(false);
-        e.target.value = null; // Reset do input file
+        e.target.value = null; 
       }
     };
     reader.readAsText(file);
@@ -647,12 +721,15 @@ export default function App() {
                   </div>
                   <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                     
-                    {/* BOTÕES DE EXPORTAR E IMPORTAR CSV */}
+                    <button onClick={handleImportMassCatalog} disabled={isProcessing} className="flex-1 min-w-[140px] bg-yellow-500 text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-yellow-600 transition-colors disabled:opacity-50">
+                      {isProcessing ? <Loader2 size={18} className="animate-spin" /> : <Zap size={18} />} Importar Base
+                    </button>
+
                     <button onClick={handleExportCSV} disabled={isProcessing} className="flex-1 min-w-[140px] bg-stone-800 text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-stone-700 transition-colors disabled:opacity-50">
-                      <Download size={18} /> Baixar CSV
+                      <Download size={18} /> Exportar CSV
                     </button>
                     
-                    <label className={`flex-1 min-w-[140px] bg-yellow-500 text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-yellow-600 transition-colors cursor-pointer ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <label className={`flex-1 min-w-[140px] bg-stone-800 text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-stone-700 transition-colors cursor-pointer ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}>
                       {isProcessing ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />} Importar CSV
                       <input type="file" accept=".csv" className="hidden" onChange={handleImportCSV} disabled={isProcessing} />
                     </label>
@@ -704,7 +781,7 @@ export default function App() {
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div><label className="block text-sm font-bold text-green-800 mb-1">Unidade</label><select value={newProduct.unit} onChange={e => setNewProduct({...newProduct, unit: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl bg-white"><option value="maço">Maço</option><option value="kg">Quilo (kg)</option><option value="unidade">Unidade</option><option value="pacote">Pacote</option><option value="dúzia">Dúzia</option><option value="litro">Litro</option></select></div>
-                        <div><label className="block text-sm font-bold text-green-800 mb-1">Categoria</label><select value={newProduct.category} onChange={e => setNewProduct({...newProduct, category: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl bg-white"><option value="Verduras">Verduras</option><option value="Legumes">Legumes</option><option value="Frutas">Frutas</option><option value="Cestas">Cestas</option><option value="Outros">Outros</option></select></div>
+                        <div><label className="block text-sm font-bold text-green-800 mb-1">Categoria</label><select value={newProduct.category} onChange={e => setNewProduct({...newProduct, category: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl bg-white"><option value="Verduras">Verduras</option><option value="Legumes">Legumes</option><option value="Frutas">Frutas</option><option value="Laticínios">Laticínios</option><option value="Mercearia">Mercearia</option><option value="Cestas">Cestas</option><option value="Outros">Outros</option></select></div>
                       </div>
                       <div className="flex flex-col sm:flex-row gap-3 mt-4">
                         <button type="submit" disabled={isProcessing} className="bg-[#007035] text-white px-8 py-3 rounded-xl font-bold w-full md:w-auto hover:bg-green-800 transition-colors disabled:bg-stone-400 flex items-center justify-center gap-2">
@@ -719,32 +796,49 @@ export default function App() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {products.map(p => (
-                    <div key={p.id} className={`flex items-center p-4 border rounded-xl transition-colors gap-4 shadow-sm ${!p.isActive ? 'bg-stone-50 border-stone-200' : 'bg-white border-stone-200 hover:border-stone-300'}`}>
-                      
-                      <div className={`w-14 h-14 flex-shrink-0 flex items-center justify-center text-3xl overflow-hidden rounded-xl bg-stone-100 border border-stone-100 ${!p.isActive && 'opacity-40 grayscale'}`}>
-                        {isImageValidUrl(p.imageUrl) ? <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" /> : <span>{p.imageUrl}</span>}
+                {/* NOVO: AGRUPAMENTO POR CATEGORIA NO ADMIN */}
+                <div className="space-y-8">
+                  {categories.filter(c => c !== 'Todos').map(category => {
+                    const catProducts = products.filter(p => p.category === category);
+                    if (catProducts.length === 0) return null;
+                    
+                    return (
+                      <div key={category} className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200">
+                        <h4 className="text-xl font-extrabold text-stone-800 mb-6 border-b border-stone-100 pb-3 flex items-center gap-2">
+                           <Tags size={20} className="text-[#008c43]"/> {category} 
+                           <span className="text-xs font-bold text-stone-400 bg-stone-100 px-2 py-1 rounded-full">{catProducts.length}</span>
+                        </h4>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {catProducts.map(p => (
+                            <div key={p.id} className={`flex items-center p-4 border rounded-xl transition-colors gap-4 shadow-sm ${!p.isActive ? 'bg-stone-50 border-stone-200' : 'bg-white border-stone-200 hover:border-stone-300'}`}>
+                              
+                              <div className={`w-14 h-14 flex-shrink-0 flex items-center justify-center text-3xl overflow-hidden rounded-xl bg-stone-100 border border-stone-100 ${!p.isActive && 'opacity-40 grayscale'}`}>
+                                {isImageValidUrl(p.imageUrl) ? <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" /> : <span>{p.imageUrl}</span>}
+                              </div>
+                              
+                              <div className="flex flex-col flex-grow">
+                                <span className={`text-sm font-bold leading-tight block ${!p.isActive ? 'text-stone-400 line-through' : 'text-stone-800'}`}>{p.name}</span>
+                                <span className="text-xs font-medium text-stone-500 mt-1">{formatCurrency(p.price)} / {p.unit}</span>
+                              </div>
+                              
+                              <div className="flex items-center gap-1 flex-shrink-0 border-l border-stone-100 pl-2">
+                                <button onClick={() => handleEditProduct(p)} className="text-stone-400 hover:text-blue-500 transition-colors p-2 hover:bg-blue-50 rounded-lg" title="Editar Produto">
+                                  <Edit2 size={16} />
+                                </button>
+                                <button onClick={() => handleDeleteProduct(p.id)} className="text-stone-400 hover:text-red-500 transition-colors p-2 hover:bg-red-50 rounded-lg" title="Eliminar Produto">
+                                  <Trash2 size={16} />
+                                </button>
+                                <button onClick={() => toggleProductStatus(p.id, p.isActive)} className={`ml-1 w-11 h-6 rounded-full relative transition-colors shadow-inner flex-shrink-0 ${p.isActive ? 'bg-[#008c43]' : 'bg-stone-300'}`}><div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all shadow-sm ${p.isActive ? 'left-6' : 'left-1'}`}></div></button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      
-                      <div className="flex flex-col flex-grow">
-                        <span className={`text-sm font-bold leading-tight block ${!p.isActive ? 'text-stone-400 line-through' : 'text-stone-800'}`}>{p.name}</span>
-                        <span className="text-xs font-medium text-stone-500 mt-1">{formatCurrency(p.price)} / {p.unit}</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-1 flex-shrink-0 border-l border-stone-100 pl-2">
-                        <button onClick={() => handleEditProduct(p)} className="text-stone-400 hover:text-blue-500 transition-colors p-2 hover:bg-blue-50 rounded-lg" title="Editar Produto">
-                          <Edit2 size={16} />
-                        </button>
-                        <button onClick={() => handleDeleteProduct(p.id)} className="text-stone-400 hover:text-red-500 transition-colors p-2 hover:bg-red-50 rounded-lg" title="Eliminar Produto">
-                          <Trash2 size={16} />
-                        </button>
-                        <button onClick={() => toggleProductStatus(p.id, p.isActive)} className={`ml-1 w-11 h-6 rounded-full relative transition-colors shadow-inner flex-shrink-0 ${p.isActive ? 'bg-[#008c43]' : 'bg-stone-300'}`}><div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all shadow-sm ${p.isActive ? 'left-6' : 'left-1'}`}></div></button>
-                      </div>
-
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
+                
               </div>
             )}
           </div>
