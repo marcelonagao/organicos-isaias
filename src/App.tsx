@@ -57,7 +57,10 @@ export default function App() {
   const [adminTab, setAdminTab] = useState('dashboard');
   const [adminDateFilter, setAdminDateFilter] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
+  // Estados para Gestão de Produtos
   const [showNewProductForm, setShowNewProductForm] = useState(false);
+  const [editingProductId, setEditingProductId] = useState(null);
   const [newProduct, setNewProduct] = useState({ name: '', price: '', unit: 'unidade', category: 'Verduras', imageUrl: '📦' });
 
   // Estados do Checkout (Stepper/Accordion)
@@ -82,7 +85,6 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
-        // Se o utilizador não for anónimo, assumimos que iniciou sessão com e-mail/palavra-passe (Administrador)
         if (!currentUser.isAnonymous) {
           setIsAdmin(true);
         } else {
@@ -215,24 +217,60 @@ export default function App() {
     catch (error) { console.error("Erro ao atualizar produto", error); }
   };
 
+  // Guardar Produto (Criar Novo ou Atualizar Existente)
   const handleAddNewProduct = async (e) => {
     e.preventDefault();
     if (!newProduct.name || !newProduct.price) return;
     try {
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), {
-        ...newProduct, price: parseFloat(newProduct.price), isActive: true, updatedAt: new Date().toISOString()
-      });
+      if (editingProductId) {
+        // Atualiza o produto existente
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', editingProductId), {
+          ...newProduct, price: parseFloat(newProduct.price), updatedAt: new Date().toISOString()
+        });
+      } else {
+        // Cria um novo produto
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), {
+          ...newProduct, price: parseFloat(newProduct.price), isActive: true, updatedAt: new Date().toISOString()
+        });
+      }
+      // Limpa os estados e fecha o formulário
       setNewProduct({ name: '', price: '', unit: 'unidade', category: 'Verduras', imageUrl: '📦' });
+      setEditingProductId(null);
       setShowNewProductForm(false);
-    } catch (error) { console.error("Erro ao adicionar produto:", error); }
+    } catch (error) { console.error("Erro ao guardar produto:", error); }
   };
 
+  // Preparar formulário para edição
+  const handleEditProduct = (product) => {
+    setNewProduct({
+      name: product.name,
+      price: product.price.toString(), // Converter para string para o formulário
+      unit: product.unit,
+      category: product.category,
+      imageUrl: product.imageUrl || ''
+    });
+    setEditingProductId(product.id);
+    setShowNewProductForm(true);
+    // Faz scroll para o topo para ver o formulário
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Eliminar Produto
   const handleDeleteProduct = async (productId) => {
-    try {
-      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', productId));
-    } catch (error) {
-      console.error("Erro ao excluir produto:", error);
+    if (window.confirm("Tens a certeza que desejas eliminar este produto? Esta ação não pode ser desfeita.")) {
+      try {
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', productId));
+      } catch (error) {
+        console.error("Erro ao eliminar produto:", error);
+      }
     }
+  };
+
+  // Limpar Formulário
+  const handleCancelForm = () => {
+    setShowNewProductForm(false);
+    setEditingProductId(null);
+    setNewProduct({ name: '', price: '', unit: 'unidade', category: 'Verduras', imageUrl: '📦' });
   };
 
   // --- LÓGICA DE CHECKOUT E API ---
@@ -432,8 +470,15 @@ export default function App() {
             {adminTab === 'catalogo' && (
               <div className="space-y-6 animate-in fade-in">
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div><h3 className="text-lg font-bold text-stone-800">Catálogo de Produtos</h3><p className="text-sm text-stone-500">Gere a disponibilidade ou cria novos.</p></div>
-                  <button onClick={() => setShowNewProductForm(!showNewProductForm)} className="bg-[#008c43] text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#007035]">{showNewProductForm ? 'Cancelar' : <><Plus size={18}/> Novo Produto</>}</button>
+                  <div>
+                    <h3 className="text-lg font-bold text-stone-800">Catálogo de Produtos</h3>
+                    <p className="text-sm text-stone-500">Gere a disponibilidade, edita ou cria novos.</p>
+                  </div>
+                  {!showNewProductForm && (
+                    <button onClick={() => { setShowNewProductForm(true); setEditingProductId(null); setNewProduct({ name: '', price: '', unit: 'unidade', category: 'Verduras', imageUrl: '📦' }); }} className="bg-[#008c43] text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#007035]">
+                      <Plus size={18}/> Novo Produto
+                    </button>
+                  )}
                 </div>
 
                 {showNewProductForm && (
@@ -451,12 +496,18 @@ export default function App() {
                           <input required type="text" value={newProduct.imageUrl} onChange={e => setNewProduct({...newProduct, imageUrl: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl" placeholder="Ex: https://... ou 🥬" />
                         </div>
                       </div>
-                      <button type="submit" className="bg-[#007035] text-white px-8 py-3 rounded-xl font-bold w-full md:w-auto mt-2 hover:bg-green-800 transition-colors">Guardar no Catálogo</button>
+                      <div className="flex flex-col sm:flex-row gap-3 mt-4">
+                        <button type="submit" className="bg-[#007035] text-white px-8 py-3 rounded-xl font-bold hover:bg-green-800 transition-colors">
+                          {editingProductId ? 'Atualizar Produto' : 'Guardar no Catálogo'}
+                        </button>
+                        <button type="button" onClick={handleCancelForm} className="bg-white text-green-800 border border-green-300 px-8 py-3 rounded-xl font-bold hover:bg-green-50 transition-colors">
+                          Cancelar
+                        </button>
+                      </div>
                     </form>
                   </div>
                 )}
 
-                {/* CORREÇÃO DO LAYOUT DA GRELHA (MAX 3 COLUNAS) E FIX DE FLEXBOX */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {products.map(p => (
                     <div key={p.id} className={`flex items-center p-4 border rounded-xl transition-colors gap-4 shadow-sm ${!p.isActive ? 'bg-stone-50 border-stone-200' : 'bg-white border-stone-200 hover:border-stone-300'}`}>
@@ -465,17 +516,22 @@ export default function App() {
                         {p.imageUrl?.startsWith('http') ? <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" /> : <span>{p.imageUrl}</span>}
                       </div>
                       
-                      {/* Envolver o texto com min-w-0 evita que empurre o resto da caixa */}
-                      <div className="flex flex-col flex-grow min-w-0">
-                        <span className={`text-sm font-bold truncate block ${!p.isActive ? 'text-stone-400 line-through' : 'text-stone-800'}`} title={p.name}>{p.name}</span>
-                        <span className="text-xs font-medium text-stone-500 mt-0.5">{formatCurrency(p.price)} / {p.unit}</span>
+                      {/* FIX: Removido truncate e min-w-0 para que o texto desça à linha se for longo */}
+                      <div className="flex flex-col flex-grow">
+                        <span className={`text-sm font-bold leading-tight block ${!p.isActive ? 'text-stone-400 line-through' : 'text-stone-800'}`}>{p.name}</span>
+                        <span className="text-xs font-medium text-stone-500 mt-1">{formatCurrency(p.price)} / {p.unit}</span>
                       </div>
                       
-                      <div className="flex items-center gap-2 flex-shrink-0 border-l border-stone-100 pl-3">
-                        <button onClick={() => handleDeleteProduct(p.id)} className="text-stone-400 hover:text-red-500 transition-colors p-2 hover:bg-red-50 rounded-lg" title="Excluir Produto">
+                      <div className="flex items-center gap-1 flex-shrink-0 border-l border-stone-100 pl-2">
+                        {/* Botão Editar Novo */}
+                        <button onClick={() => handleEditProduct(p)} className="text-stone-400 hover:text-blue-500 transition-colors p-2 hover:bg-blue-50 rounded-lg" title="Editar Produto">
+                          <Edit2 size={16} />
+                        </button>
+                        {/* Botão Eliminar */}
+                        <button onClick={() => handleDeleteProduct(p.id)} className="text-stone-400 hover:text-red-500 transition-colors p-2 hover:bg-red-50 rounded-lg" title="Eliminar Produto">
                           <Trash2 size={16} />
                         </button>
-                        <button onClick={() => toggleProductStatus(p.id, p.isActive)} className={`w-11 h-6 rounded-full relative transition-colors shadow-inner flex-shrink-0 ${p.isActive ? 'bg-[#008c43]' : 'bg-stone-300'}`}><div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all shadow-sm ${p.isActive ? 'left-6' : 'left-1'}`}></div></button>
+                        <button onClick={() => toggleProductStatus(p.id, p.isActive)} className={`ml-1 w-11 h-6 rounded-full relative transition-colors shadow-inner flex-shrink-0 ${p.isActive ? 'bg-[#008c43]' : 'bg-stone-300'}`}><div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all shadow-sm ${p.isActive ? 'left-6' : 'left-1'}`}></div></button>
                       </div>
 
                     </div>
