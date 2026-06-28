@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ShoppingCart, Leaf, MapPin, Calendar, 
   CreditCard, Banknote, ChevronLeft, ChevronRight, Plus, Minus, CheckCircle2,
-  Store, Search, User, Package, Clock, Truck, ShieldCheck, Map, ListChecks, Tags, BarChart3, TrendingUp, Menu, X, Edit2, Lock, Trash2
+  Store, Search, User, Package, Clock, Truck, ShieldCheck, Map, ListChecks, Tags, BarChart3, TrendingUp, Menu, X, Edit2, Lock, Trash2, ImagePlus, Loader2
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, signInWithEmailAndPassword, signOut } from 'firebase/auth';
@@ -50,7 +50,7 @@ export default function App() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('Todos');
 
-  // Estados do Painel Admin (Sidebar & Autenticação)
+  // Estados do Painel Admin
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -62,8 +62,9 @@ export default function App() {
   const [showNewProductForm, setShowNewProductForm] = useState(false);
   const [editingProductId, setEditingProductId] = useState(null);
   const [newProduct, setNewProduct] = useState({ name: '', price: '', unit: 'unidade', category: 'Verduras', imageUrl: '📦' });
+  const [imageFileName, setImageFileName] = useState(''); // Apenas para mostrar o nome do arquivo na UI
 
-  // Estados do Checkout (Stepper/Accordion)
+  // Estados do Checkout
   const [checkoutStep, setCheckoutStep] = useState(1);
   const [checkoutForm, setCheckoutForm] = useState({
     name: '', phone: '', zipCode: '', street: '', number: '', neighborhood: '', city: '', state: '',
@@ -85,11 +86,7 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
-        if (!currentUser.isAnonymous) {
-          setIsAdmin(true);
-        } else {
-          setIsAdmin(false);
-        }
+        setIsAdmin(!currentUser.isAnonymous);
       } else {
         initAuth();
       }
@@ -98,18 +95,16 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // --- BUSCA DE DADOS REAIS (FIRESTORE) ---
+  // --- BUSCA DE DADOS (FIRESTORE) ---
   useEffect(() => {
     if (!user) return;
     
-    // 1. Ouvir os Produtos da Base de Dados
     const productsRef = collection(db, 'artifacts', appId, 'public', 'data', 'products');
     const unsubProducts = onSnapshot(productsRef, (snapshot) => {
       setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
     });
 
-    // 2. Ouvir as Definições da Loja
     const settingsRef = collection(db, 'artifacts', appId, 'public', 'data', 'settings');
     const unsubSettings = onSnapshot(settingsRef, async (snapshot) => {
       const configDoc = snapshot.docs.find(doc => doc.id === 'store_config');
@@ -129,7 +124,6 @@ export default function App() {
       }
     });
 
-    // 3. Ouvir os Pedidos (Orders)
     const ordersRef = collection(db, 'artifacts', appId, 'public', 'data', 'orders');
     const unsubOrders = onSnapshot(ordersRef, (snapshot) => {
       const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -217,52 +211,104 @@ export default function App() {
     catch (error) { console.error("Erro ao atualizar produto", error); }
   };
 
-  // Guardar Produto (Criar Novo ou Atualizar Existente)
+  // --- A MÁGICA DO BASE64 COM COMPRESSÃO (FILE READER + CANVAS) ---
+  const handleImageSelection = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setImageFileName(file.name);
+    setIsProcessing(true);
+
+    const reader = new FileReader();
+    reader.readAsDataURL(file); // Passo 2: Lê o arquivo
+    
+    reader.onload = (event) => {
+      // Passo 3 extra: Criar uma imagem em memória para comprimir
+      const img = new Image();
+      img.src = event.target.result;
+      
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 600; // Limita a largura para manter o Base64 pequeno (<1MB)
+        const MAX_HEIGHT = 600;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+        } else {
+          if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Converte o canvas comprimido de volta para texto Base64 (Qualidade 0.7 = 70%)
+        const base64String = canvas.toDataURL('image/jpeg', 0.7);
+        
+        // Coloca o texto Base64 gigante dentro do estado do Produto
+        setNewProduct(prev => ({ ...prev, imageUrl: base64String }));
+        setIsProcessing(false);
+      };
+    };
+  };
+
+  // Guardar Produto (Direto no Firestore, sem Storage)
   const handleAddNewProduct = async (e) => {
     e.preventDefault();
     if (!newProduct.name || !newProduct.price) return;
+    
+    setIsProcessing(true);
+
     try {
+      const productData = {
+        ...newProduct, 
+        price: parseFloat(newProduct.price), 
+        updatedAt: new Date().toISOString()
+      };
+
       if (editingProductId) {
-        // Atualiza o produto existente
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', editingProductId), {
-          ...newProduct, price: parseFloat(newProduct.price), updatedAt: new Date().toISOString()
-        });
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', editingProductId), productData);
       } else {
-        // Cria um novo produto
-        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), {
-          ...newProduct, price: parseFloat(newProduct.price), isActive: true, updatedAt: new Date().toISOString()
-        });
+        productData.isActive = true;
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), productData);
       }
-      // Limpa os estados e fecha o formulário
+
       setNewProduct({ name: '', price: '', unit: 'unidade', category: 'Verduras', imageUrl: '📦' });
+      setImageFileName('');
       setEditingProductId(null);
       setShowNewProductForm(false);
-    } catch (error) { console.error("Erro ao guardar produto:", error); }
+    } catch (error) { 
+      console.error("Erro ao guardar produto:", error);
+      alert("Falha ao guardar. O arquivo pode estar grande demais.");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   // Preparar formulário para edição
   const handleEditProduct = (product) => {
     setNewProduct({
       name: product.name,
-      price: product.price.toString(), // Converter para string para o formulário
+      price: product.price.toString(), 
       unit: product.unit,
       category: product.category,
       imageUrl: product.imageUrl || ''
     });
+    setImageFileName(''); 
     setEditingProductId(product.id);
     setShowNewProductForm(true);
-    // Faz scroll para o topo para ver o formulário
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Eliminar Produto
   const handleDeleteProduct = async (productId) => {
-    if (window.confirm("Tens a certeza que desejas eliminar este produto? Esta ação não pode ser desfeita.")) {
+    if (window.confirm("Tem a certeza que deseja eliminar este produto? Esta ação não pode ser desfeita.")) {
       try {
         await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', productId));
-      } catch (error) {
-        console.error("Erro ao eliminar produto:", error);
-      }
+      } catch (error) { console.error("Erro ao eliminar produto:", error); }
     }
   };
 
@@ -270,6 +316,7 @@ export default function App() {
   const handleCancelForm = () => {
     setShowNewProductForm(false);
     setEditingProductId(null);
+    setImageFileName('');
     setNewProduct({ name: '', price: '', unit: 'unidade', category: 'Verduras', imageUrl: '📦' });
   };
 
@@ -323,6 +370,12 @@ export default function App() {
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#f5f5f5] text-[#008c43] font-bold">A carregar app...</div>;
+
+  // Função utilitária para verificar se a imagem é Base64 ou URL
+  const isImageValidUrl = (str) => {
+    if (!str) return false;
+    return str.startsWith('http') || str.startsWith('data:image/');
+  };
 
   // ==========================================
   // VISTA DO ADMINISTRADOR (SISTEMA COM SIDEBAR)
@@ -475,7 +528,7 @@ export default function App() {
                     <p className="text-sm text-stone-500">Gere a disponibilidade, edita ou cria novos.</p>
                   </div>
                   {!showNewProductForm && (
-                    <button onClick={() => { setShowNewProductForm(true); setEditingProductId(null); setNewProduct({ name: '', price: '', unit: 'unidade', category: 'Verduras', imageUrl: '📦' }); }} className="bg-[#008c43] text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#007035]">
+                    <button onClick={() => { setShowNewProductForm(true); setEditingProductId(null); setNewProduct({ name: '', price: '', unit: 'unidade', category: 'Verduras', imageUrl: '📦' }); setImageFileName(''); }} className="bg-[#008c43] text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#007035]">
                       <Plus size={18}/> Novo Produto
                     </button>
                   )}
@@ -484,6 +537,37 @@ export default function App() {
                 {showNewProductForm && (
                   <div className="bg-[#e6f4ea] p-6 rounded-2xl border border-[#c8e6c9] animate-in slide-in-from-top-4">
                     <form onSubmit={handleAddNewProduct} className="space-y-4">
+                      
+                      {/* O TRUQUE DO BASE64: SEM STORAGE, DIRETO NO BANCO */}
+                      <div className="bg-white p-5 rounded-xl border border-green-200 shadow-sm mb-4">
+                        <label className="block text-sm font-bold text-green-800 mb-3">Imagem do Produto</label>
+                        <div className="flex flex-col sm:flex-row gap-5">
+                          
+                          <div className="flex-1">
+                            <span className="text-xs font-bold text-stone-500 mb-2 block uppercase tracking-wider">Opção 1: Enviar da Galeria</span>
+                            <label className={`flex flex-col items-center justify-center w-full h-24 px-4 transition bg-stone-50 border-2 border-dashed rounded-xl cursor-pointer hover:bg-green-50 ${imageFileName ? 'border-green-500' : 'border-stone-300'}`}>
+                                <div className="flex flex-col items-center space-y-1">
+                                    <ImagePlus size={24} className={imageFileName ? "text-green-600" : "text-stone-400"} />
+                                    <span className="font-bold text-sm text-center line-clamp-1 max-w-full px-2" style={{color: imageFileName ? '#008c43' : '#78716c'}}>
+                                        {imageFileName ? imageFileName : 'Clique para selecionar'}
+                                    </span>
+                                </div>
+                                <input type="file" className="hidden" accept="image/*" onChange={handleImageSelection} />
+                            </label>
+                          </div>
+
+                          <div className="flex items-center justify-center py-2 sm:py-0">
+                            <span className="text-stone-300 font-extrabold text-sm">OU</span>
+                          </div>
+
+                          <div className="flex-1">
+                             <span className="text-xs font-bold text-stone-500 mb-2 block uppercase tracking-wider">Opção 2: Emoji Rápido</span>
+                             <input type="text" value={newProduct.imageUrl} onChange={e => setNewProduct({...newProduct, imageUrl: e.target.value})} className="w-full h-24 p-4 text-center border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 bg-white shadow-inner text-2xl" placeholder="Ex: 🥬" disabled={!!imageFileName} />
+                          </div>
+                          
+                        </div>
+                      </div>
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div><label className="block text-sm font-bold text-green-800 mb-1">Nome do Produto</label><input required type="text" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Ex: Rúcula Fresca" /></div>
                         <div><label className="block text-sm font-bold text-green-800 mb-1">Preço (R$)</label><input required type="number" step="0.01" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Ex: 4.50" /></div>
@@ -491,14 +575,11 @@ export default function App() {
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div><label className="block text-sm font-bold text-green-800 mb-1">Unidade</label><select value={newProduct.unit} onChange={e => setNewProduct({...newProduct, unit: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl bg-white"><option value="maço">Maço</option><option value="kg">Quilo (kg)</option><option value="unidade">Unidade</option><option value="bandeja">Bandeja</option></select></div>
                         <div><label className="block text-sm font-bold text-green-800 mb-1">Categoria</label><select value={newProduct.category} onChange={e => setNewProduct({...newProduct, category: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl bg-white"><option value="Verduras">Verduras</option><option value="Legumes">Legumes</option><option value="Frutas">Frutas</option><option value="Cestas">Cestas</option><option value="Outros">Outros</option></select></div>
-                        <div>
-                          <label className="block text-sm font-bold text-green-800 mb-1">Link da Foto (URL) ou Emoji</label>
-                          <input required type="text" value={newProduct.imageUrl} onChange={e => setNewProduct({...newProduct, imageUrl: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl" placeholder="Ex: https://... ou 🥬" />
-                        </div>
                       </div>
                       <div className="flex flex-col sm:flex-row gap-3 mt-4">
-                        <button type="submit" className="bg-[#007035] text-white px-8 py-3 rounded-xl font-bold hover:bg-green-800 transition-colors">
-                          {editingProductId ? 'Atualizar Produto' : 'Guardar no Catálogo'}
+                        <button type="submit" disabled={isProcessing} className="bg-[#007035] text-white px-8 py-3 rounded-xl font-bold w-full md:w-auto hover:bg-green-800 transition-colors disabled:bg-stone-400 flex items-center justify-center gap-2">
+                          {isProcessing && <Loader2 size={18} className="animate-spin" />}
+                          {isProcessing ? 'A carregar...' : (editingProductId ? 'Atualizar Produto' : 'Guardar no Catálogo')}
                         </button>
                         <button type="button" onClick={handleCancelForm} className="bg-white text-green-800 border border-green-300 px-8 py-3 rounded-xl font-bold hover:bg-green-50 transition-colors">
                           Cancelar
@@ -513,21 +594,18 @@ export default function App() {
                     <div key={p.id} className={`flex items-center p-4 border rounded-xl transition-colors gap-4 shadow-sm ${!p.isActive ? 'bg-stone-50 border-stone-200' : 'bg-white border-stone-200 hover:border-stone-300'}`}>
                       
                       <div className={`w-14 h-14 flex-shrink-0 flex items-center justify-center text-3xl overflow-hidden rounded-xl bg-stone-100 border border-stone-100 ${!p.isActive && 'opacity-40 grayscale'}`}>
-                        {p.imageUrl?.startsWith('http') ? <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" /> : <span>{p.imageUrl}</span>}
+                        {isImageValidUrl(p.imageUrl) ? <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" /> : <span>{p.imageUrl}</span>}
                       </div>
                       
-                      {/* FIX: Removido truncate e min-w-0 para que o texto desça à linha se for longo */}
                       <div className="flex flex-col flex-grow">
                         <span className={`text-sm font-bold leading-tight block ${!p.isActive ? 'text-stone-400 line-through' : 'text-stone-800'}`}>{p.name}</span>
                         <span className="text-xs font-medium text-stone-500 mt-1">{formatCurrency(p.price)} / {p.unit}</span>
                       </div>
                       
                       <div className="flex items-center gap-1 flex-shrink-0 border-l border-stone-100 pl-2">
-                        {/* Botão Editar Novo */}
                         <button onClick={() => handleEditProduct(p)} className="text-stone-400 hover:text-blue-500 transition-colors p-2 hover:bg-blue-50 rounded-lg" title="Editar Produto">
                           <Edit2 size={16} />
                         </button>
-                        {/* Botão Eliminar */}
                         <button onClick={() => handleDeleteProduct(p.id)} className="text-stone-400 hover:text-red-500 transition-colors p-2 hover:bg-red-50 rounded-lg" title="Eliminar Produto">
                           <Trash2 size={16} />
                         </button>
@@ -652,7 +730,7 @@ export default function App() {
                   return (
                     <div key={product.id} className={`bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden flex flex-col p-3 ${!settings?.isOpen ? 'opacity-60 pointer-events-none' : ''}`}>
                       <div className="w-full aspect-square bg-stone-50 rounded-xl flex flex-col items-center justify-center overflow-hidden mb-3">
-                        {product.imageUrl?.startsWith('http') ? <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" /> : <span className="text-6xl">{product.imageUrl}</span>}
+                        {isImageValidUrl(product.imageUrl) ? <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" /> : <span className="text-6xl">{product.imageUrl}</span>}
                       </div>
                       <div className="flex flex-col flex-grow">
                         <h3 className="text-[13px] sm:text-sm font-bold text-stone-800 leading-snug line-clamp-2">{product.name}</h3>
@@ -734,7 +812,7 @@ export default function App() {
                       <div className="flex items-center gap-4 w-full sm:w-auto">
                         
                         <div className="w-20 h-20 bg-stone-100 rounded-2xl border border-stone-200 flex items-center justify-center flex-shrink-0 text-4xl overflow-hidden">
-                          {item.imageUrl?.startsWith('http') ? <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" /> : item.imageUrl}
+                          {isImageValidUrl(item.imageUrl) ? <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" /> : item.imageUrl}
                         </div>
 
                         <div className="flex-grow">
