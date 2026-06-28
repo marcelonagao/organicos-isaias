@@ -2,11 +2,11 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ShoppingCart, Leaf, MapPin, Calendar, 
   CreditCard, Banknote, ChevronLeft, ChevronRight, Plus, Minus, CheckCircle2,
-  Store, Search, User, Package, Clock, Truck, ShieldCheck, Map, ListChecks, Tags, BarChart3, TrendingUp, Menu, X, Edit2, Lock
+  Store, Search, User, Package, Clock, Truck, ShieldCheck, Map, ListChecks, Tags, BarChart3, TrendingUp, Menu, X, Edit2, Lock, Trash2
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { getFirestore, collection, addDoc, onSnapshot, doc, setDoc, getDocs, updateDoc } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, onSnapshot, doc, setDoc, getDocs, updateDoc, deleteDoc } from 'firebase/firestore';
 
 // --- CONFIGURAÇÃO FIREBASE ---
 const firebaseConfig = {
@@ -82,14 +82,12 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
-        // Se o utilizador não for anónimo, assumimos que iniciou sessão com e-mail/palavra-passe (Administrador)
         if (!currentUser.isAnonymous) {
           setIsAdmin(true);
         } else {
           setIsAdmin(false);
         }
       } else {
-        // Se for feito o término de sessão, inicia novamente uma sessão anónima para a vitrine
         initAuth();
       }
     });
@@ -121,7 +119,6 @@ export default function App() {
           setAdminDateFilter(prev => prev || activeDays[0].dayOfWeek); 
         }
       } else {
-        // Cria uma configuração base mínima para a loja não bloquear caso a base de dados esteja vazia
         await setDoc(doc(settingsRef, 'store_config'), {
           isOpen: true,
           deliveryDays: [{ dayOfWeek: "Terça-feira", active: true }, { dayOfWeek: "Sexta-feira", active: true }]
@@ -185,7 +182,7 @@ export default function App() {
     return { totalRevenue, totalOrders, citySales };
   }, [allOrders]);
 
-  // --- AÇÕES DO ADMINISTRADOR (LOGIN E LOGOUT) ---
+  // --- AÇÕES DO ADMINISTRADOR ---
   const handleAdminLogin = async (e) => {
     e.preventDefault();
     setLoginError('');
@@ -207,6 +204,37 @@ export default function App() {
     setView('home');
   };
 
+  const updateOrderStatus = async (orderId, newStatus) => {
+    try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'orders', orderId), { status: newStatus }); } 
+    catch (error) { console.error("Erro ao atualizar pedido", error); }
+  };
+
+  const toggleProductStatus = async (productId, currentStatus) => {
+    try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', productId), { isActive: !currentStatus }); } 
+    catch (error) { console.error("Erro ao atualizar produto", error); }
+  };
+
+  const handleAddNewProduct = async (e) => {
+    e.preventDefault();
+    if (!newProduct.name || !newProduct.price) return;
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), {
+        ...newProduct, price: parseFloat(newProduct.price), isActive: true, updatedAt: new Date().toISOString()
+      });
+      setNewProduct({ name: '', price: '', unit: 'unidade', category: 'Verduras', imageUrl: '📦' });
+      setShowNewProductForm(false);
+    } catch (error) { console.error("Erro ao adicionar produto:", error); }
+  };
+
+  // NOVA FUNÇÃO: Excluir Produto
+  const handleDeleteProduct = async (productId) => {
+    try {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', productId));
+    } catch (error) {
+      console.error("Erro ao excluir produto:", error);
+    }
+  };
+
   // --- LÓGICA DE CHECKOUT E API ---
   const handleFormChange = (e) => setCheckoutForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
   const handleCepChange = async (e) => {
@@ -222,9 +250,9 @@ export default function App() {
   };
 
   const nextCheckoutStep = (stepNumber) => {
-    if (stepNumber === 2 && (!checkoutForm.name || !checkoutForm.phone)) return alert("Preenche Nome e WhatsApp.");
-    if (stepNumber === 3 && (!checkoutForm.zipCode || !checkoutForm.street || !checkoutForm.number)) return alert("Preenche os dados da morada.");
-    if (stepNumber === 4 && (!checkoutForm.deliveryDate)) return alert("Seleciona uma data de entrega.");
+    if (stepNumber === 2 && (!checkoutForm.name || !checkoutForm.phone)) return alert("Preencha Nome e WhatsApp.");
+    if (stepNumber === 3 && (!checkoutForm.zipCode || !checkoutForm.street || !checkoutForm.number)) return alert("Preencha os dados do endereço.");
+    if (stepNumber === 4 && (!checkoutForm.deliveryDate)) return alert("Selecione uma data de entrega.");
     setCheckoutStep(stepNumber);
   };
 
@@ -254,28 +282,6 @@ export default function App() {
       setView('success');
     } catch (error) { alert("Erro ao processar pedido."); } 
     finally { setIsProcessing(false); }
-  };
-
-  const updateOrderStatus = async (orderId, newStatus) => {
-    try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'orders', orderId), { status: newStatus }); } 
-    catch (error) { console.error("Erro ao atualizar pedido", error); }
-  };
-
-  const toggleProductStatus = async (productId, currentStatus) => {
-    try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', productId), { isActive: !currentStatus }); } 
-    catch (error) { console.error("Erro ao atualizar produto", error); }
-  };
-
-  const handleAddNewProduct = async (e) => {
-    e.preventDefault();
-    if (!newProduct.name || !newProduct.price) return;
-    try {
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), {
-        ...newProduct, price: parseFloat(newProduct.price), isActive: true, updatedAt: new Date().toISOString()
-      });
-      setNewProduct({ name: '', price: '', unit: 'unidade', category: 'Verduras', imageUrl: '📦' });
-      setShowNewProductForm(false);
-    } catch (error) { console.error("Erro ao adicionar produto:", error); }
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#f5f5f5] text-[#008c43] font-bold">A carregar app...</div>;
@@ -334,7 +340,7 @@ export default function App() {
               <div className="bg-white p-5 rounded-2xl shadow-sm border border-stone-200 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <h2 className="text-xl font-bold text-stone-800">Logística e Separação</h2>
-                  <p className="text-sm text-stone-500">A filtrar pedidos agendados.</p>
+                  <p className="text-sm text-stone-500">Filtrando pedidos agendados.</p>
                 </div>
                 <div className="flex items-center gap-3 bg-stone-50 p-2 rounded-xl border border-stone-100">
                   <Calendar size={18} className="text-[#008c43] ml-2" />
@@ -460,7 +466,14 @@ export default function App() {
                           </div>
                           <div><span className={`text-sm font-bold pr-2 block ${!p.isActive ? 'text-stone-400 line-through' : 'text-stone-800'}`}>{p.name}</span><span className="text-xs font-medium text-stone-500">{formatCurrency(p.price)}</span></div>
                         </div>
-                        <button onClick={() => toggleProductStatus(p.id, p.isActive)} className={`w-12 h-6 rounded-full relative transition-colors shadow-inner flex-shrink-0 ${p.isActive ? 'bg-[#008c43]' : 'bg-stone-300'}`}><div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all shadow-sm ${p.isActive ? 'left-7' : 'left-1'}`}></div></button>
+                        
+                        {/* NOVO BOTÃO DE EXCLUIR */}
+                        <div className="flex items-center gap-3">
+                          <button onClick={() => handleDeleteProduct(p.id)} className="text-stone-400 hover:text-red-500 transition-colors p-1" title="Excluir Produto">
+                            <Trash2 size={18} />
+                          </button>
+                          <button onClick={() => toggleProductStatus(p.id, p.isActive)} className={`w-12 h-6 rounded-full relative transition-colors shadow-inner flex-shrink-0 ${p.isActive ? 'bg-[#008c43]' : 'bg-stone-300'}`}><div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all shadow-sm ${p.isActive ? 'left-7' : 'left-1'}`}></div></button>
+                        </div>
                       </div>
                     ))}
                   </div>
