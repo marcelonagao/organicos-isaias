@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ShoppingCart, Leaf, MapPin, Calendar, 
   CreditCard, Banknote, ChevronLeft, ChevronRight, Plus, Minus, CheckCircle2,
-  Store, Search, User, Package, Clock, Truck, ShieldCheck, Map, ListChecks, Tags, BarChart3, TrendingUp, Menu, X, Edit2, Lock, Trash2, ImagePlus, Loader2, Zap
+  Store, Search, User, Package, Clock, Truck, ShieldCheck, Map, ListChecks, Tags, BarChart3, TrendingUp, Menu, X, Edit2, Lock, Trash2, ImagePlus, Loader2, Download, Upload
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, signInWithEmailAndPassword, signOut } from 'firebase/auth';
@@ -142,7 +142,6 @@ export default function App() {
   const cartItemsCount = useMemo(() => cart.reduce((sum, item) => sum + item.qty, 0), [cart]);
 
   const categories = useMemo(() => {
-    // Forçar ordem personalizada das categorias para não ficar alfabético
     const order = ['Verduras', 'Legumes', 'Frutas', 'Cestas', 'Outros'];
     const currentCats = [...new Set(products.map(p => p.category))];
     const sortedCats = currentCats.sort((a, b) => {
@@ -224,7 +223,6 @@ export default function App() {
     catch (error) { console.error("Erro ao atualizar produto", error); }
   };
 
-  // --- A MÁGICA DO BASE64 COM COMPRESSÃO (FILE READER + CANVAS) ---
   const handleImageSelection = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -233,7 +231,7 @@ export default function App() {
     setIsProcessing(true);
 
     const reader = new FileReader();
-    reader.readAsDataURL(file); // Lê o arquivo
+    reader.readAsDataURL(file); 
     
     reader.onload = (event) => {
       const img = new Image();
@@ -257,14 +255,13 @@ export default function App() {
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, width, height);
 
-        const base64String = canvas.toDataURL('image/jpeg', 0.7); // 70% quality
+        const base64String = canvas.toDataURL('image/jpeg', 0.7); 
         setNewProduct(prev => ({ ...prev, imageUrl: base64String }));
         setIsProcessing(false);
       };
     };
   };
 
-  // Guardar Produto (Direto no Firestore, sem Storage)
   const handleAddNewProduct = async (e) => {
     e.preventDefault();
     if (!newProduct.name || !newProduct.price) return;
@@ -326,87 +323,121 @@ export default function App() {
     setNewProduct({ name: '', price: '', unit: 'unidade', category: 'Verduras', imageUrl: '📦' });
   };
 
-  // --- IMPORTAÇÃO EM MASSA DO CATÁLOGO DO SR. IZAIAS ---
-  const handleImportMassCatalog = async () => {
-    if (!window.confirm("Deseja importar automaticamente a lista completa de 54 produtos do Sr. Izaias? ISSO PODE DEMORAR ALGUNS SEGUNDOS.")) return;
-    
-    setIsProcessing(true);
-    
-    const catalogoIzaias = [
-      { name: "Alface Americana", price: 5.00, unit: "maço", category: "Verduras", imageUrl: "🥬" },
-      { name: "Alface Crespa", price: 4.50, unit: "maço", category: "Verduras", imageUrl: "🥬" },
-      { name: "Alface Roxa", price: 4.50, unit: "maço", category: "Verduras", imageUrl: "🥬" },
-      { name: "Alface Lisa", price: 4.50, unit: "maço", category: "Verduras", imageUrl: "🥬" },
-      { name: "Agrião da Água", price: 7.00, unit: "maço", category: "Verduras", imageUrl: "🌿" },
-      { name: "Alho Poró", price: 6.00, unit: "unidade", category: "Verduras", imageUrl: "🧅" },
-      { name: "Couve", price: 6.00, unit: "maço", category: "Verduras", imageUrl: "🥬" },
-      { name: "Rúcula", price: 7.00, unit: "maço", category: "Verduras", imageUrl: "🌿" },
-      { name: "Espinafre", price: 7.00, unit: "maço", category: "Verduras", imageUrl: "🌿" },
-      { name: "Cheiro Verde", price: 5.00, unit: "maço", category: "Verduras", imageUrl: "🌿" },
-      { name: "Salsinha", price: 5.00, unit: "maço", category: "Verduras", imageUrl: "🌿" },
-      { name: "Coentro", price: 5.00, unit: "maço", category: "Verduras", imageUrl: "🌿" },
-      { name: "Jiló 500g", price: 6.00, unit: "pacote", category: "Legumes", imageUrl: "🫒" },
-      { name: "Inhame 500g", price: 6.00, unit: "pacote", category: "Legumes", imageUrl: "🥔" },
-      { name: "Gengibre 300g", price: 6.00, unit: "pacote", category: "Legumes", imageUrl: "🫚" },
-      { name: "Chuchu 800 a 900g", price: 7.00, unit: "unidade", category: "Legumes", imageUrl: "🍐" },
-      { name: "Pepino Japonês 500g", price: 6.00, unit: "pacote", category: "Legumes", imageUrl: "🥒" },
-      { name: "Cebola 550 a 600g", price: 5.00, unit: "pacote", category: "Legumes", imageUrl: "🧅" },
-      { name: "Cebola Roxa 550 a 600g", price: 7.00, unit: "pacote", category: "Legumes", imageUrl: "🧅" },
-      { name: "Limão Cravo 800g", price: 6.00, unit: "pacote", category: "Frutas", imageUrl: "🍋" },
-      { name: "Tomate Italiano", price: 14.00, unit: "kg", category: "Legumes", imageUrl: "🍅" },
-      { name: "Abobrinha Itália 700 a 800g", price: 8.00, unit: "unidade", category: "Legumes", imageUrl: "🥒" },
-      { name: "Berinjela 750 a 850g", price: 9.00, unit: "unidade", category: "Legumes", imageUrl: "🍆" },
-      { name: "Abóbora Cabotian", price: 7.00, unit: "kg", category: "Legumes", imageUrl: "🎃" },
-      { name: "Batata Doce Salmão", price: 12.00, unit: "kg", category: "Legumes", imageUrl: "🍠" },
-      { name: "Batata Doce Roxa", price: 10.00, unit: "kg", category: "Legumes", imageUrl: "🍠" },
-      { name: "Batata Doce Rosada", price: 8.00, unit: "kg", category: "Legumes", imageUrl: "🍠" },
-      { name: "Feijão Carioca", price: 15.00, unit: "kg", category: "Outros", imageUrl: "🫘" },
-      { name: "Feijão Fava Verde 500g", price: 20.00, unit: "pacote", category: "Outros", imageUrl: "🫛" },
-      { name: "Banana Nanica Verde", price: 13.00, unit: "dúzia", category: "Frutas", imageUrl: "🍌" },
-      { name: "Mandioca Limpa Congelada 700g", price: 7.00, unit: "pacote", category: "Legumes", imageUrl: "🥔" },
-      { name: "Maracujá Congelado 500g", price: 20.00, unit: "pacote", category: "Frutas", imageUrl: "🟡" },
-      { name: "Mel Silvestre 800g", price: 60.00, unit: "unidade", category: "Outros", imageUrl: "🍯" },
-      { name: "Ovos de Galinha Caipira", price: 19.00, unit: "dúzia", category: "Outros", imageUrl: "🥚" },
-      { name: "Queijo Fresco (Búfala) 500g", price: 25.00, unit: "unidade", category: "Outros", imageUrl: "🧀" },
-      { name: "Queijo Nozinho (Búfala) 500g", price: 35.00, unit: "unidade", category: "Outros", imageUrl: "🧀" },
-      { name: "Queijo Parmesão (Búfala) 500g", price: 35.00, unit: "unidade", category: "Outros", imageUrl: "🧀" },
-      { name: "Queijo Bola Seca (Búfala) 500g", price: 32.00, unit: "unidade", category: "Outros", imageUrl: "🧀" },
-      { name: "Queijo Mussarela (Búfala) 500g", price: 32.00, unit: "unidade", category: "Outros", imageUrl: "🧀" },
-      { name: "Doce de Leite Cremoso 300g", price: 15.00, unit: "unidade", category: "Outros", imageUrl: "🍮" },
-      { name: "Leite de Búfala 2 Litros", price: 15.00, unit: "unidade", category: "Outros", imageUrl: "🥛" },
-      { name: "Queijo Meia Cura (Vaca) 500g", price: 34.00, unit: "unidade", category: "Outros", imageUrl: "🧀" },
-      { name: "Queijo Parmesão (Vaca) 600g", price: 38.00, unit: "unidade", category: "Outros", imageUrl: "🧀" },
-      { name: "Queijo Nozinho (Vaca) 500g", price: 32.00, unit: "unidade", category: "Outros", imageUrl: "🧀" },
-      { name: "Queijo Nozinho Temperado (Vaca) 500g", price: 35.00, unit: "unidade", category: "Outros", imageUrl: "🧀" },
-      { name: "Queijo Parmesão ao Vinho (Vaca) 600g", price: 42.00, unit: "unidade", category: "Outros", imageUrl: "🧀" },
-      { name: "Manteiga 250g", price: 15.00, unit: "unidade", category: "Outros", imageUrl: "🧈" },
-      { name: "Goiabada Cascão 500g", price: 16.00, unit: "unidade", category: "Outros", imageUrl: "🥮" },
-      { name: "Geleia de Cambuci Artesanal 300g", price: 10.00, unit: "unidade", category: "Outros", imageUrl: "🫙" },
-      { name: "Açúcar Mascavo Artesanal 500g", price: 13.00, unit: "unidade", category: "Outros", imageUrl: "🟤" },
-      { name: "Farinha de Mandioca Artesanal 500g", price: 12.00, unit: "unidade", category: "Outros", imageUrl: "🥣" },
-      { name: "Melado de Cana Artesanal 420g", price: 12.00, unit: "unidade", category: "Outros", imageUrl: "🍯" },
-      { name: "Extrato de Cambuci Artesanal 1L", price: 30.00, unit: "litro", category: "Outros", imageUrl: "🍾" },
-      { name: "Cachaça Artesanal 1L", price: 18.00, unit: "litro", category: "Outros", imageUrl: "🍷" }
-    ];
+  // --- NOVO: EXPORTAÇÃO E IMPORTAÇÃO DE CSV ---
+  const handleExportCSV = () => {
+    const headers = ['id', 'name', 'price', 'unit', 'category', 'isActive', 'imageUrl'];
+    const csvContent = [
+      headers.join(';'), // Usamos ; porque no Brasil o Excel costuma abrir melhor assim
+      ...products.map(p => {
+        // Remove quebras de linha e protege os textos com aspas
+        return [
+          p.id,
+          `"${p.name}"`,
+          p.price,
+          `"${p.unit}"`,
+          `"${p.category}"`,
+          p.isActive,
+          `"${p.imageUrl || ''}"`
+        ].join(';');
+      })
+    ].join('\n');
 
-    try {
-      const batchPromises = catalogoIzaias.map(prod => 
-        addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), {
-          ...prod,
-          isActive: true,
-          updatedAt: new Date().toISOString()
-        })
-      );
-      
-      await Promise.all(batchPromises);
-      alert("Lista importada com sucesso!");
-    } catch (error) {
-      console.error(error);
-      alert("Erro ao importar a lista.");
-    } finally {
-      setIsProcessing(false);
-    }
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'catalogo_organicos_izaias.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
+
+  const handleImportCSV = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!window.confirm("Atenção: A importação irá atualizar produtos existentes e criar novos. Recomendamos fazer um Exportar CSV antes por segurança. Deseja continuar?")) {
+      e.target.value = null;
+      return;
+    }
+
+    setIsProcessing(true);
+    const reader = new FileReader();
+
+    reader.onload = async (event) => {
+      try {
+        const text = event.target.result;
+        const rows = text.split('\n').filter(row => row.trim() !== '');
+        if (rows.length < 2) throw new Error("O ficheiro CSV está vazio ou inválido.");
+
+        // Detectar separador (vírgula ou ponto e vírgula)
+        const separator = rows[0].includes(';') ? ';' : ',';
+        const headers = rows[0].split(separator).map(h => h.trim().replace(/"/g, ''));
+
+        const idIdx = headers.indexOf('id');
+        const nameIdx = headers.indexOf('name');
+        const priceIdx = headers.indexOf('price');
+        const unitIdx = headers.indexOf('unit');
+        const catIdx = headers.indexOf('category');
+        const activeIdx = headers.indexOf('isActive');
+        const imgIdx = headers.indexOf('imageUrl');
+
+        if (nameIdx === -1 || priceIdx === -1) throw new Error("As colunas 'name' e 'price' são obrigatórias.");
+
+        const batchPromises = [];
+
+        for (let i = 1; i < rows.length; i++) {
+          // Limpeza básica da linha, ignorando aspas
+          const cleanRow = rows[i].split(separator).map(val => val.replace(/^"|"$/g, '').trim());
+
+          const id = idIdx !== -1 ? cleanRow[idIdx] : null;
+          const name = cleanRow[nameIdx];
+          let priceStr = cleanRow[priceIdx];
+          
+          if (!name || !priceStr) continue;
+
+          // Tratamento para aceitar preços com vírgula (formato brasileiro)
+          priceStr = priceStr.replace(',', '.');
+          const price = parseFloat(priceStr);
+
+          if (isNaN(price)) continue;
+
+          const unit = unitIdx !== -1 && cleanRow[unitIdx] ? cleanRow[unitIdx] : 'unidade';
+          const category = catIdx !== -1 && cleanRow[catIdx] ? cleanRow[catIdx] : 'Outros';
+          const isActive = activeIdx !== -1 ? (cleanRow[activeIdx].toLowerCase() === 'true') : true;
+          const imageUrl = imgIdx !== -1 && cleanRow[imgIdx] ? cleanRow[imgIdx] : '📦';
+
+          const productData = {
+            name,
+            price,
+            unit,
+            category,
+            isActive,
+            imageUrl,
+            updatedAt: new Date().toISOString()
+          };
+
+          // Se tiver ID válido, atualiza. Se não, cria um novo.
+          if (id && id.length > 5) {
+            batchPromises.push(updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', id), productData));
+          } else {
+            batchPromises.push(addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), productData));
+          }
+        }
+
+        await Promise.all(batchPromises);
+        alert("Catálogo atualizado via CSV com sucesso!");
+      } catch (error) {
+        console.error(error);
+        alert("Erro ao importar CSV: " + error.message);
+      } finally {
+        setIsProcessing(false);
+        e.target.value = null; // Reset do input file
+      }
+    };
+    reader.readAsText(file);
+  };
+
 
   // --- LÓGICA DE CHECKOUT E API ---
   const handleFormChange = (e) => setCheckoutForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -459,7 +490,6 @@ export default function App() {
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#f5f5f5] text-[#008c43] font-bold">A carregar app...</div>;
 
-  // Função utilitária para verificar se a imagem é Base64 ou URL
   const isImageValidUrl = (str) => {
     if (!str) return false;
     return str.startsWith('http') || str.startsWith('data:image/');
@@ -613,15 +643,23 @@ export default function App() {
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
                     <h3 className="text-lg font-bold text-stone-800">Catálogo de Produtos</h3>
-                    <p className="text-sm text-stone-500">Gere a disponibilidade, edita ou cria novos.</p>
+                    <p className="text-sm text-stone-500">Faça a gestão em massa via Excel ou edite individualmente.</p>
                   </div>
-                  <div className="flex gap-2 w-full sm:w-auto">
-                    <button onClick={handleImportMassCatalog} disabled={isProcessing} className="flex-1 bg-yellow-500 text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-yellow-600 disabled:opacity-50">
-                      {isProcessing ? <Loader2 size={18} className="animate-spin" /> : <Zap size={18} />} Importar Base
+                  <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                    
+                    {/* BOTÕES DE EXPORTAR E IMPORTAR CSV */}
+                    <button onClick={handleExportCSV} disabled={isProcessing} className="flex-1 min-w-[140px] bg-stone-800 text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-stone-700 transition-colors disabled:opacity-50">
+                      <Download size={18} /> Baixar CSV
                     </button>
+                    
+                    <label className={`flex-1 min-w-[140px] bg-yellow-500 text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-yellow-600 transition-colors cursor-pointer ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}>
+                      {isProcessing ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />} Importar CSV
+                      <input type="file" accept=".csv" className="hidden" onChange={handleImportCSV} disabled={isProcessing} />
+                    </label>
+
                     {!showNewProductForm && (
-                      <button onClick={() => { setShowNewProductForm(true); setEditingProductId(null); setNewProduct({ name: '', price: '', unit: 'unidade', category: 'Verduras', imageUrl: '📦' }); setImageFileName(''); }} className="flex-1 bg-[#008c43] text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#007035]">
-                        <Plus size={18}/> Novo
+                      <button onClick={() => { setShowNewProductForm(true); setEditingProductId(null); setNewProduct({ name: '', price: '', unit: 'unidade', category: 'Verduras', imageUrl: '📦' }); setImageFileName(''); }} className="flex-1 min-w-[140px] bg-[#008c43] text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#007035]">
+                        <Plus size={18}/> Novo Produto
                       </button>
                     )}
                   </div>
@@ -631,7 +669,6 @@ export default function App() {
                   <div className="bg-[#e6f4ea] p-6 rounded-2xl border border-[#c8e6c9] animate-in slide-in-from-top-4">
                     <form onSubmit={handleAddNewProduct} className="space-y-4">
                       
-                      {/* O TRUQUE DO BASE64: SEM STORAGE, DIRETO NO BANCO */}
                       <div className="bg-white p-5 rounded-xl border border-green-200 shadow-sm mb-4">
                         <label className="block text-sm font-bold text-green-800 mb-3">Imagem do Produto</label>
                         <div className="flex flex-col sm:flex-row gap-5">
