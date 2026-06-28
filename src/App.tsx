@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ShoppingCart, Leaf, MapPin, Calendar, 
   CreditCard, Banknote, ChevronLeft, ChevronRight, Plus, Minus, CheckCircle2,
-  Store, Search, User, Package, Clock, Truck, ShieldCheck, Map, ListChecks, Tags, BarChart3, TrendingUp, Menu, X, Edit2, Lock, Trash2, ImagePlus, Loader2, Download, Upload
+  Store, Search, User, Package, Clock, Truck, ShieldCheck, Map, ListChecks, Tags, BarChart3, TrendingUp, Menu, X, Edit2, Lock, Trash2, ImagePlus, Loader2, Download, Upload, AlertCircle
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, signInWithEmailAndPassword, signOut } from 'firebase/auth';
@@ -79,6 +79,7 @@ export default function App() {
           try {
             await signInWithCustomToken(auth, __initial_auth_token);
           } catch (tokenError) {
+            console.warn("Token inválido, a usar sessão anónima:", tokenError);
             await signInAnonymously(auth);
           }
         } else if (!auth.currentUser) {
@@ -115,16 +116,24 @@ export default function App() {
       if (configDoc) {
         const data = configDoc.data();
         setSettings(data);
-        const activeDays = data.deliveryDays.filter(d => d.active);
+        const activeDays = data.deliveryDays?.filter(d => d.active) || [];
         if (activeDays.length > 0) {
           setCheckoutForm(prev => ({ ...prev, deliveryDate: prev.deliveryDate || activeDays[0].dayOfWeek }));
           setAdminDateFilter(prev => prev || activeDays[0].dayOfWeek); 
         }
       } else {
-        await setDoc(doc(settingsRef, 'store_config'), {
+        // Inicializar com as regras de negócio do Sr. Izaias
+        const defaultSettings = {
           isOpen: true,
-          deliveryDays: [{ dayOfWeek: "Terça-feira", active: true }, { dayOfWeek: "Sexta-feira", active: true }]
-        });
+          minimumOrderValue: 30, // Pedido mínimo de 30 reais
+          cutoffMessage: "Pedidos da semana encerram Segunda-feira às 19h!",
+          deliveryDays: [
+            { dayOfWeek: "Terça-feira (Porto Novo até Martins de Sá)", active: true },
+            { dayOfWeek: "Quarta-feira (Getúba até Tabatinga)", active: true }
+          ]
+        };
+        await setDoc(doc(settingsRef, 'store_config'), defaultSettings);
+        setSettings(defaultSettings);
       }
     });
 
@@ -144,9 +153,12 @@ export default function App() {
   const updateQty = (id, delta) => setCart(prev => prev.map(i => i.id === id ? { ...i, qty: i.qty + delta } : i).filter(i => i.qty > 0));
   const cartTotal = useMemo(() => cart.reduce((sum, item) => sum + (item.price * item.qty), 0), [cart]);
   const cartItemsCount = useMemo(() => cart.reduce((sum, item) => sum + item.qty, 0), [cart]);
+  
+  // Regras de Negócio
+  const minOrderValue = settings?.minimumOrderValue || 30;
+  const isMinOrderMet = cartTotal >= minOrderValue;
 
   const categories = useMemo(() => {
-    // Nova ordem lógica incluindo Laticínios e Mercearia
     const order = ['Verduras', 'Legumes', 'Frutas', 'Laticínios', 'Mercearia', 'Cestas', 'Outros'];
     const currentCats = [...new Set(products.map(p => p.category))];
     const sortedCats = currentCats.sort((a, b) => {
@@ -631,8 +643,8 @@ export default function App() {
                 </div>
                 <div className="flex items-center gap-3 bg-stone-50 p-2 rounded-xl border border-stone-100">
                   <Calendar size={18} className="text-[#008c43] ml-2" />
-                  <select value={adminDateFilter} onChange={(e) => setAdminDateFilter(e.target.value)} className="bg-transparent text-stone-800 font-bold py-1 pr-4 outline-none cursor-pointer">
-                    {settings?.deliveryDays.map(d => <option key={d.dayOfWeek} value={d.dayOfWeek}>{d.dayOfWeek}</option>)}
+                  <select value={adminDateFilter} onChange={(e) => setAdminDateFilter(e.target.value)} className="bg-transparent text-stone-800 font-bold py-1 pr-4 outline-none cursor-pointer max-w-[200px] truncate">
+                    {settings?.deliveryDays?.map(d => <option key={d.dayOfWeek} value={d.dayOfWeek}>{d.dayOfWeek}</option>)}
                   </select>
                 </div>
               </div>
@@ -668,7 +680,7 @@ export default function App() {
             {adminTab === 'colheita' && (
               <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden animate-in fade-in">
                 <div className="bg-[#e6f4ea] p-5 border-b border-[#c8e6c9] flex items-center justify-between">
-                  <h3 className="font-bold text-[#007035] flex items-center gap-2"><Leaf size={20}/> Para colher: {adminDateFilter}</h3>
+                  <h3 className="font-bold text-[#007035] flex items-center gap-2"><Leaf size={20}/> Para colher:</h3>
                   <span className="bg-white text-[#007035] shadow-sm py-1.5 px-4 rounded-full text-sm font-bold border border-[#c8e6c9]">{adminFilteredOrders.length} Pedidos</span>
                 </div>
                 {harvestList.length === 0 ? <p className="p-12 text-center text-stone-500">Nenhum pedido agendado.</p> : (
@@ -932,6 +944,16 @@ export default function App() {
         {/* --- VISTA: VITRINE --- */}
         {view === 'home' && (
           <div className="animate-in fade-in pb-20">
+
+            {/* ALERTA DE REGRAS DE NEGÓCIO */}
+            {settings?.cutoffMessage && (
+               <div className="bg-orange-50 border border-orange-200 text-orange-800 p-3 rounded-xl mb-4 text-center font-bold text-sm shadow-sm flex flex-col sm:flex-row items-center justify-center gap-2">
+                 <div className="flex items-center gap-2"><AlertCircle size={18} /> {settings.cutoffMessage}</div>
+                 <span className="hidden sm:inline">•</span>
+                 <div>Pedido Mínimo: {formatCurrency(minOrderValue)}</div>
+               </div>
+            )}
+
             <div className="flex overflow-x-auto gap-2 pb-4 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
               {categories.map(cat => (
                 <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-5 py-2.5 rounded-full text-sm font-bold whitespace-nowrap border transition-colors shadow-sm ${selectedCategory === cat ? 'bg-[#005e33] text-white border-[#005e33]' : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-50'}`}>
@@ -1063,10 +1085,18 @@ export default function App() {
                 <div className="w-full lg:w-96 flex-shrink-0">
                   <div className="bg-white rounded-3xl shadow-sm border border-stone-200 p-6 lg:sticky top-24">
                     <h3 className="font-bold text-stone-800 text-lg mb-6 border-b border-stone-100 pb-4">Resumo do Pedido</h3>
+                    
                     <div className="flex justify-between items-center text-stone-600 mb-4 font-medium"><span className="text-sm">Produtos ({cartItemsCount})</span><span className="text-sm">{formatCurrency(cartTotal)}</span></div>
                     <div className="flex justify-between items-center text-stone-600 mb-6 border-b border-stone-100 pb-6"><span className="text-sm">Taxa de Entrega</span><span className="text-sm text-[#00a650] font-bold bg-[#e6f4ea] px-2 py-0.5 rounded">Grátis</span></div>
                     <div className="flex justify-between items-center text-stone-900 font-extrabold text-2xl mb-8"><span>Total</span><span>{formatCurrency(cartTotal)}</span></div>
-                    <button onClick={() => { setView('checkout'); setCheckoutStep(1); }} className="w-full bg-[#008c43] text-white py-4 rounded-2xl font-bold text-lg hover:bg-[#007035] transition-transform active:scale-95 shadow-md flex justify-center items-center gap-2">
+                    
+                    {!isMinOrderMet && (
+                      <div className="bg-red-50 text-red-700 p-3 rounded-xl text-sm font-bold mb-4 text-center border border-red-100">
+                        Faltam {formatCurrency(minOrderValue - cartTotal)} para o pedido mínimo.
+                      </div>
+                    )}
+
+                    <button onClick={() => { setView('checkout'); setCheckoutStep(1); }} disabled={!isMinOrderMet} className="w-full bg-[#008c43] text-white py-4 rounded-2xl font-bold text-lg hover:bg-[#007035] transition-transform active:scale-95 shadow-md flex justify-center items-center gap-2 disabled:bg-stone-300 disabled:cursor-not-allowed disabled:shadow-none disabled:active:scale-100">
                       Avançar <ChevronRight size={20}/>
                     </button>
                   </div>
@@ -1144,10 +1174,10 @@ export default function App() {
                   
                   {checkoutStep === 3 && (
                     <div className="px-5 pb-6 sm:px-6 animate-in slide-in-from-top-2">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-                        {settings?.deliveryDays.filter(d => d.active).map(day => (
+                      <div className="grid grid-cols-1 gap-3 mb-6">
+                        {settings?.deliveryDays?.filter(d => d.active).map(day => (
                           <label key={day.dayOfWeek} className={`p-5 border-2 rounded-2xl flex items-center cursor-pointer transition-all ${checkoutForm.deliveryDate === day.dayOfWeek ? 'border-[#008c43] bg-[#e6f4ea]' : 'border-stone-100 hover:border-stone-300'}`}>
-                            <input type="radio" name="deliveryDate" value={day.dayOfWeek} checked={checkoutForm.deliveryDate === day.dayOfWeek} onChange={handleFormChange} className="mr-3 w-5 h-5 accent-[#008c43]" />
+                            <input type="radio" name="deliveryDate" value={day.dayOfWeek} checked={checkoutForm.deliveryDate === day.dayOfWeek} onChange={handleFormChange} className="mr-3 w-5 h-5 accent-[#008c43] flex-shrink-0" />
                             <span className="font-bold text-stone-800">{day.dayOfWeek}</span>
                           </label>
                         ))}
@@ -1155,7 +1185,7 @@ export default function App() {
                       <button onClick={() => nextCheckoutStep(4)} className="bg-[#008c43] text-white px-8 py-4 rounded-xl font-bold hover:bg-[#007035] w-full sm:w-auto">Continuar para Pagamento</button>
                     </div>
                   )}
-                  {checkoutStep > 3 && <div className="px-5 pb-5 sm:px-6 pt-0 text-sm font-bold text-stone-800 ml-11">Receber na {checkoutForm.deliveryDate}</div>}
+                  {checkoutStep > 3 && <div className="px-5 pb-5 sm:px-6 pt-0 text-sm font-bold text-stone-800 ml-11">{checkoutForm.deliveryDate}</div>}
                 </div>
 
                 {/* Passo 4: Pagamento */}
@@ -1201,7 +1231,13 @@ export default function App() {
                   <div className="flex justify-between items-center text-stone-600 mb-6 border-b border-stone-100 pb-6"><span className="text-sm">Taxa de Entrega</span><span className="text-sm text-[#00a650] font-bold bg-[#e6f4ea] px-2 py-0.5 rounded">Grátis</span></div>
                   <div className="flex justify-between items-center text-stone-900 font-extrabold text-2xl mb-8"><span>Total</span><span>{formatCurrency(cartTotal)}</span></div>
                   
-                  <button type="submit" form="checkout-form-final" disabled={isProcessing || checkoutStep !== 4} className="w-full bg-[#008c43] text-white py-4 rounded-2xl font-bold text-lg hover:bg-[#007035] transition-transform active:scale-95 shadow-md flex justify-center items-center gap-2 disabled:bg-stone-300 disabled:cursor-not-allowed disabled:shadow-none">
+                  {!isMinOrderMet && (
+                    <div className="bg-red-50 text-red-700 p-3 rounded-xl text-sm font-bold mb-4 text-center border border-red-100">
+                      Faltam {formatCurrency(minOrderValue - cartTotal)} para o pedido mínimo.
+                    </div>
+                  )}
+
+                  <button type="submit" form="checkout-form-final" disabled={isProcessing || checkoutStep !== 4 || !isMinOrderMet} className="w-full bg-[#008c43] text-white py-4 rounded-2xl font-bold text-lg hover:bg-[#007035] transition-transform active:scale-95 shadow-md flex justify-center items-center gap-2 disabled:bg-stone-300 disabled:cursor-not-allowed disabled:shadow-none disabled:active:scale-100">
                     {isProcessing ? 'Processando...' : 'Finalizar Pedido'}
                   </button>
                   {checkoutStep !== 4 && <p className="text-xs text-center text-stone-400 mt-3 font-medium">Preencha os passos anteriores para finalizar.</p>}
