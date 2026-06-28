@@ -115,7 +115,24 @@ export default function App() {
     const unsubSettings = onSnapshot(settingsRef, async (snapshot) => {
       const configDoc = snapshot.docs.find(doc => doc.id === 'store_config');
       if (configDoc) {
-        const data = configDoc.data();
+        let data = configDoc.data();
+        
+        // --- AUTO-MIGRAÇÃO DE REGRAS DE NEGÓCIO ---
+        // Atualiza os dias antigos para os novos automaticamente no banco de dados
+        if (data.deliveryDays && data.deliveryDays.some(d => d.dayOfWeek === "Sexta-feira" || d.dayOfWeek === "Terça-feira")) {
+          const updatedSettings = {
+            ...data,
+            minimumOrderValue: 30,
+            cutoffMessage: "Pedidos da semana encerram Segunda-feira às 19h!",
+            deliveryDays: [
+              { dayOfWeek: "Terça-feira após 16h (Porto Novo a Martins de Sá)", active: true },
+              { dayOfWeek: "Quarta-feira após 8h (Getúba a Tabatinga)", active: true }
+            ]
+          };
+          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'store_config'), updatedSettings);
+          data = updatedSettings; // Atualiza a variável local para uso imediato
+        }
+
         setSettings(data);
         const activeDays = data.deliveryDays?.filter(d => d.active) || [];
         if (activeDays.length > 0) {
@@ -123,7 +140,7 @@ export default function App() {
           setAdminDateFilter(prev => prev || activeDays[0].dayOfWeek); 
         }
       } else {
-        // Inicializar com as regras exatas do Sr. Izaias
+        // Inicializar com as regras exatas do Sr. Izaias (se o banco estiver vazio)
         const defaultSettings = {
           isOpen: true,
           minimumOrderValue: 30, // Pedido mínimo de 30 reais
