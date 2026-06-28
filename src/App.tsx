@@ -97,16 +97,18 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // --- BUSCA DE DADOS (FIRESTORE) ---
+  // --- BUSCA DE DADOS REAIS (FIRESTORE) ---
   useEffect(() => {
     if (!user) return;
     
+    // 1. Ouvir os Produtos da Base de Dados
     const productsRef = collection(db, 'artifacts', appId, 'public', 'data', 'products');
     const unsubProducts = onSnapshot(productsRef, (snapshot) => {
       setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
     });
 
+    // 2. Ouvir as Definições da Loja
     const settingsRef = collection(db, 'artifacts', appId, 'public', 'data', 'settings');
     const unsubSettings = onSnapshot(settingsRef, async (snapshot) => {
       const configDoc = snapshot.docs.find(doc => doc.id === 'store_config');
@@ -119,7 +121,7 @@ export default function App() {
           setAdminDateFilter(prev => prev || activeDays[0].dayOfWeek); 
         }
       } else {
-        // Cria uma configuração base mínima para a loja não bloquear caso seja apagada
+        // Cria uma configuração base mínima para a loja não bloquear caso a base de dados esteja vazia
         await setDoc(doc(settingsRef, 'store_config'), {
           isOpen: true,
           deliveryDays: [{ dayOfWeek: "Terça-feira", active: true }, { dayOfWeek: "Sexta-feira", active: true }]
@@ -127,6 +129,7 @@ export default function App() {
       }
     });
 
+    // 3. Ouvir os Pedidos (Orders)
     const ordersRef = collection(db, 'artifacts', appId, 'public', 'data', 'orders');
     const unsubOrders = onSnapshot(ordersRef, (snapshot) => {
       const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -219,9 +222,9 @@ export default function App() {
   };
 
   const nextCheckoutStep = (stepNumber) => {
-    if (stepNumber === 2 && (!checkoutForm.name || !checkoutForm.phone)) return alert("Preencha Nome e WhatsApp.");
-    if (stepNumber === 3 && (!checkoutForm.zipCode || !checkoutForm.street || !checkoutForm.number)) return alert("Preencha os dados do endereço.");
-    if (stepNumber === 4 && (!checkoutForm.deliveryDate)) return alert("Selecione uma data de entrega.");
+    if (stepNumber === 2 && (!checkoutForm.name || !checkoutForm.phone)) return alert("Preenche Nome e WhatsApp.");
+    if (stepNumber === 3 && (!checkoutForm.zipCode || !checkoutForm.street || !checkoutForm.number)) return alert("Preenche os dados da morada.");
+    if (stepNumber === 4 && (!checkoutForm.deliveryDate)) return alert("Seleciona uma data de entrega.");
     setCheckoutStep(stepNumber);
   };
 
@@ -275,7 +278,7 @@ export default function App() {
     } catch (error) { console.error("Erro ao adicionar produto:", error); }
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#f5f5f5] text-[#008c43] font-bold">Carregando app...</div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#f5f5f5] text-[#008c43] font-bold">A carregar app...</div>;
 
   // ==========================================
   // VISTA DO ADMINISTRADOR (SISTEMA COM SIDEBAR)
@@ -331,7 +334,7 @@ export default function App() {
               <div className="bg-white p-5 rounded-2xl shadow-sm border border-stone-200 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <h2 className="text-xl font-bold text-stone-800">Logística e Separação</h2>
-                  <p className="text-sm text-stone-500">Filtrando pedidos agendados.</p>
+                  <p className="text-sm text-stone-500">A filtrar pedidos agendados.</p>
                 </div>
                 <div className="flex items-center gap-3 bg-stone-50 p-2 rounded-xl border border-stone-100">
                   <Calendar size={18} className="text-[#008c43] ml-2" />
@@ -423,7 +426,7 @@ export default function App() {
             {adminTab === 'catalogo' && (
               <div className="space-y-6 animate-in fade-in">
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div><h3 className="text-lg font-bold text-stone-800">Catálogo de Produtos</h3><p className="text-sm text-stone-500">Gerencie a disponibilidade ou crie novos.</p></div>
+                  <div><h3 className="text-lg font-bold text-stone-800">Catálogo de Produtos</h3><p className="text-sm text-stone-500">Gere a disponibilidade ou cria novos.</p></div>
                   <button onClick={() => setShowNewProductForm(!showNewProductForm)} className="bg-[#008c43] text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#007035]">{showNewProductForm ? 'Cancelar' : <><Plus size={18}/> Novo Produto</>}</button>
                 </div>
 
@@ -442,7 +445,7 @@ export default function App() {
                           <input required type="text" value={newProduct.imageUrl} onChange={e => setNewProduct({...newProduct, imageUrl: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl" placeholder="Ex: https://... ou 🥬" />
                         </div>
                       </div>
-                      <button type="submit" className="bg-[#007035] text-white px-8 py-3 rounded-xl font-bold w-full md:w-auto mt-2 hover:bg-green-800 transition-colors">Salvar no Catálogo</button>
+                      <button type="submit" className="bg-[#007035] text-white px-8 py-3 rounded-xl font-bold w-full md:w-auto mt-2 hover:bg-green-800 transition-colors">Guardar no Catálogo</button>
                     </form>
                   </div>
                 )}
