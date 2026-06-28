@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ShoppingCart, Leaf, MapPin, Calendar, 
   CreditCard, Banknote, ChevronLeft, ChevronRight, Plus, Minus, CheckCircle2,
-  Store, Search, User, Package, Clock, Truck, ShieldCheck, Map, ListChecks, Tags, BarChart3, TrendingUp, Menu, X, Edit2, Lock, Trash2, ImagePlus, Loader2, Download, Upload, AlertCircle
+  Store, Search, User, Package, Clock, Truck, ShieldCheck, Map, ListChecks, Tags, BarChart3, TrendingUp, Menu, X, Edit2, Lock, Trash2, ImagePlus, Loader2, Download, Upload, AlertCircle, Zap
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, signInWithEmailAndPassword, signOut } from 'firebase/auth';
@@ -122,7 +122,6 @@ export default function App() {
           setAdminDateFilter(prev => prev || activeDays[0].dayOfWeek); 
         }
       } else {
-        // Inicializar com as regras de negócio do Sr. Izaias
         const defaultSettings = {
           isOpen: true,
           minimumOrderValue: 30, // Pedido mínimo de 30 reais
@@ -322,7 +321,7 @@ export default function App() {
     setImageFileName(''); 
     setEditingProductId(product.id);
     setShowNewProductForm(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Removido o window.scrollTo para a tela não subir abruptamente!
   };
 
   const handleDeleteProduct = async (productId) => {
@@ -545,8 +544,8 @@ export default function App() {
         </aside>
 
         {/* Conteúdo Principal do Admin */}
-        <main className="flex-1 h-full overflow-y-auto bg-stone-100 pt-16 md:pt-0">
-          <div className="max-w-5xl mx-auto w-full p-4 md:p-8">
+        <main className="flex-1 h-full overflow-y-auto bg-stone-100 pt-16 md:pt-0 relative">
+          <div className="max-w-5xl mx-auto w-full p-4 md:p-8 pb-32">
             
             {/* Header de Filtro para Abas de Logística */}
             {['colheita', 'roteiro'].includes(adminTab) && (
@@ -650,7 +649,6 @@ export default function App() {
                     <p className="text-sm text-stone-500">Faça a gestão em massa via Excel ou edite individualmente.</p>
                   </div>
                   <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-                    
                     <button onClick={handleExportCSV} disabled={isProcessing} className="flex-1 min-w-[140px] bg-stone-800 text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-stone-700 transition-colors disabled:opacity-50">
                       <Download size={18} /> Exportar CSV
                     </button>
@@ -660,69 +658,85 @@ export default function App() {
                       <input type="file" accept=".csv" className="hidden" onChange={handleImportCSV} disabled={isProcessing} />
                     </label>
 
-                    {!showNewProductForm && (
-                      <button onClick={() => { setShowNewProductForm(true); setEditingProductId(null); setNewProduct({ name: '', price: '', unit: 'unidade', category: 'Verduras', imageUrl: '📦' }); setImageFileName(''); }} className="flex-1 min-w-[140px] bg-[#008c43] text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#007035]">
-                        <Plus size={18}/> Novo Produto
-                      </button>
-                    )}
+                    <button onClick={() => { setShowNewProductForm(true); setEditingProductId(null); setNewProduct({ name: '', price: '', unit: 'unidade', category: 'Verduras', imageUrl: '📦' }); setImageFileName(''); }} className="flex-1 min-w-[140px] bg-[#008c43] text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#007035]">
+                      <Plus size={18}/> Novo Produto
+                    </button>
                   </div>
                 </div>
 
+                {/* MODAL DE EDIÇÃO / CRIAÇÃO DE PRODUTO */}
                 {showNewProductForm && (
-                  <div className="bg-[#e6f4ea] p-6 rounded-2xl border border-[#c8e6c9] animate-in slide-in-from-top-4">
-                    <form onSubmit={handleAddNewProduct} className="space-y-4">
+                  <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+                    {/* Fundo Escuro */}
+                    <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm transition-opacity" onClick={handleCancelForm}></div>
+                    
+                    {/* Conteúdo do Modal */}
+                    <div className="relative w-full max-w-2xl bg-[#e6f4ea] rounded-3xl shadow-2xl border border-[#c8e6c9] max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 fade-in duration-200">
                       
-                      <div className="bg-white p-5 rounded-xl border border-green-200 shadow-sm mb-4">
-                        <label className="block text-sm font-bold text-green-800 mb-3">Imagem do Produto</label>
-                        <div className="flex flex-col sm:flex-row gap-5">
-                          
-                          <div className="flex-1">
-                            <span className="text-xs font-bold text-stone-500 mb-2 block uppercase tracking-wider">Opção 1: Enviar da Galeria</span>
-                            <label className={`flex flex-col items-center justify-center w-full h-24 px-4 transition bg-stone-50 border-2 border-dashed rounded-xl cursor-pointer hover:bg-green-50 ${imageFileName ? 'border-green-500' : 'border-stone-300'}`}>
-                                <div className="flex flex-col items-center space-y-1">
-                                    <ImagePlus size={24} className={imageFileName ? "text-green-600" : "text-stone-400"} />
-                                    <span className="font-bold text-sm text-center line-clamp-1 max-w-full px-2" style={{color: imageFileName ? '#008c43' : '#78716c'}}>
-                                        {imageFileName ? imageFileName : 'Clique para selecionar'}
-                                    </span>
-                                </div>
-                                <input type="file" className="hidden" accept="image/*" onChange={handleImageSelection} />
-                            </label>
-                          </div>
-
-                          <div className="flex items-center justify-center py-2 sm:py-0">
-                            <span className="text-stone-300 font-extrabold text-sm">OU</span>
-                          </div>
-
-                          <div className="flex-1">
-                             <span className="text-xs font-bold text-stone-500 mb-2 block uppercase tracking-wider">Opção 2: Emoji Rápido</span>
-                             <input type="text" value={newProduct.imageUrl} onChange={e => setNewProduct({...newProduct, imageUrl: e.target.value})} className="w-full h-24 p-4 text-center border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 bg-white shadow-inner text-2xl" placeholder="Ex: 🥬" disabled={!!imageFileName} />
-                          </div>
-                          
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div><label className="block text-sm font-bold text-green-800 mb-1">Nome do Produto</label><input required type="text" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Ex: Rúcula Fresca" /></div>
-                        <div><label className="block text-sm font-bold text-green-800 mb-1">Preço (R$)</label><input required type="number" step="0.01" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Ex: 4.50" /></div>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div><label className="block text-sm font-bold text-green-800 mb-1">Unidade</label><select value={newProduct.unit} onChange={e => setNewProduct({...newProduct, unit: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl bg-white"><option value="maço">Maço</option><option value="kg">Quilo (kg)</option><option value="unidade">Unidade</option><option value="pacote">Pacote</option><option value="dúzia">Dúzia</option><option value="litro">Litro</option></select></div>
-                        <div><label className="block text-sm font-bold text-green-800 mb-1">Categoria</label><select value={newProduct.category} onChange={e => setNewProduct({...newProduct, category: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl bg-white"><option value="Verduras">Verduras</option><option value="Legumes">Legumes</option><option value="Frutas">Frutas</option><option value="Laticínios">Laticínios</option><option value="Mercearia">Mercearia</option><option value="Cestas">Cestas</option><option value="Outros">Outros</option></select></div>
-                      </div>
-                      <div className="flex flex-col sm:flex-row gap-3 mt-4">
-                        <button type="submit" disabled={isProcessing} className="bg-[#007035] text-white px-8 py-3 rounded-xl font-bold w-full md:w-auto hover:bg-green-800 transition-colors disabled:bg-stone-400 flex items-center justify-center gap-2">
-                          {isProcessing && <Loader2 size={18} className="animate-spin" />}
-                          {isProcessing ? 'A carregar...' : (editingProductId ? 'Atualizar Produto' : 'Guardar no Catálogo')}
-                        </button>
-                        <button type="button" onClick={handleCancelForm} className="bg-white text-green-800 border border-green-300 px-8 py-3 rounded-xl font-bold hover:bg-green-50 transition-colors">
-                          Cancelar
+                      {/* Cabeçalho do Modal Fixo */}
+                      <div className="bg-[#e6f4ea] border-b border-[#c8e6c9] px-6 py-4 flex justify-between items-center flex-shrink-0 z-10">
+                        <h3 className="text-xl font-bold text-green-800 flex items-center gap-2">
+                          {editingProductId ? <Edit2 size={20}/> : <Plus size={20}/>}
+                          {editingProductId ? 'Editar Produto' : 'Novo Produto'}
+                        </h3>
+                        <button onClick={handleCancelForm} className="text-green-800 hover:bg-green-200 p-2 rounded-full transition-colors">
+                          <X size={24} />
                         </button>
                       </div>
-                    </form>
+
+                      {/* Corpo do Modal ROLÁVEL */}
+                      <div className="p-6 overflow-y-auto">
+                        <form onSubmit={handleAddNewProduct} className="space-y-4 pb-4">
+                          
+                          <div className="bg-white p-5 rounded-xl border border-green-200 shadow-sm mb-4">
+                            <label className="block text-sm font-bold text-green-800 mb-3">Imagem do Produto</label>
+                            <div className="flex flex-col sm:flex-row gap-5">
+                              <div className="flex-1">
+                                <span className="text-xs font-bold text-stone-500 mb-2 block uppercase tracking-wider">Opção 1: Enviar da Galeria</span>
+                                <label className={`flex flex-col items-center justify-center w-full h-24 px-4 transition bg-stone-50 border-2 border-dashed rounded-xl cursor-pointer hover:bg-green-50 ${imageFileName ? 'border-green-500' : 'border-stone-300'}`}>
+                                    <div className="flex flex-col items-center space-y-1">
+                                        <ImagePlus size={24} className={imageFileName ? "text-green-600" : "text-stone-400"} />
+                                        <span className="font-bold text-sm text-center line-clamp-1 max-w-full px-2" style={{color: imageFileName ? '#008c43' : '#78716c'}}>
+                                            {imageFileName ? imageFileName : 'Clique para selecionar'}
+                                        </span>
+                                    </div>
+                                    <input type="file" className="hidden" accept="image/*" onChange={handleImageSelection} />
+                                </label>
+                              </div>
+                              <div className="flex items-center justify-center py-2 sm:py-0">
+                                <span className="text-stone-300 font-extrabold text-sm">OU</span>
+                              </div>
+                              <div className="flex-1">
+                                <span className="text-xs font-bold text-stone-500 mb-2 block uppercase tracking-wider">Opção 2: Emoji Rápido</span>
+                                <input type="text" value={newProduct.imageUrl} onChange={e => setNewProduct({...newProduct, imageUrl: e.target.value})} className="w-full h-24 p-4 text-center border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 bg-white shadow-inner text-2xl" placeholder="Ex: 🥬" disabled={!!imageFileName} />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div><label className="block text-sm font-bold text-green-800 mb-1">Nome do Produto</label><input required type="text" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Ex: Rúcula Fresca" /></div>
+                            <div><label className="block text-sm font-bold text-green-800 mb-1">Preço (R$)</label><input required type="number" step="0.01" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Ex: 4.50" /></div>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div><label className="block text-sm font-bold text-green-800 mb-1">Unidade</label><select value={newProduct.unit} onChange={e => setNewProduct({...newProduct, unit: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl bg-white"><option value="maço">Maço</option><option value="kg">Quilo (kg)</option><option value="unidade">Unidade</option><option value="pacote">Pacote</option><option value="dúzia">Dúzia</option><option value="litro">Litro</option></select></div>
+                            <div><label className="block text-sm font-bold text-green-800 mb-1">Categoria</label><select value={newProduct.category} onChange={e => setNewProduct({...newProduct, category: e.target.value})} className="w-full p-3 border border-green-300 rounded-xl bg-white"><option value="Verduras">Verduras</option><option value="Legumes">Legumes</option><option value="Frutas">Frutas</option><option value="Laticínios">Laticínios</option><option value="Mercearia">Mercearia</option><option value="Cestas">Cestas</option><option value="Outros">Outros</option></select></div>
+                          </div>
+                          <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-green-200 mt-6">
+                            <button type="submit" disabled={isProcessing} className="bg-[#007035] text-white px-8 py-4 rounded-xl font-bold w-full md:w-auto hover:bg-green-800 transition-colors disabled:bg-stone-400 flex items-center justify-center gap-2 text-lg">
+                              {isProcessing && <Loader2 size={20} className="animate-spin" />}
+                              {isProcessing ? 'A carregar...' : (editingProductId ? 'Atualizar Produto' : 'Guardar no Catálogo')}
+                            </button>
+                            <button type="button" onClick={handleCancelForm} className="bg-white text-green-800 border border-green-300 px-8 py-4 rounded-xl font-bold hover:bg-green-50 transition-colors w-full md:w-auto">
+                              Cancelar
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+                    </div>
                   </div>
                 )}
 
-                {/* NOVO: AGRUPAMENTO POR CATEGORIA NO ADMIN */}
+                {/* AGRUPAMENTO POR CATEGORIA NO ADMIN */}
                 <div className="space-y-8">
                   {categories.filter(c => c !== 'Todos').map(category => {
                     const catProducts = products.filter(p => p.category === category);
