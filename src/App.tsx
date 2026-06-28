@@ -82,6 +82,7 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
+        // Se o utilizador não for anónimo, assumimos que iniciou sessão com e-mail/palavra-passe (Administrador)
         if (!currentUser.isAnonymous) {
           setIsAdmin(true);
         } else {
@@ -226,7 +227,6 @@ export default function App() {
     } catch (error) { console.error("Erro ao adicionar produto:", error); }
   };
 
-  // NOVA FUNÇÃO: Excluir Produto
   const handleDeleteProduct = async (productId) => {
     try {
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', productId));
@@ -456,27 +456,30 @@ export default function App() {
                   </div>
                 )}
 
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {products.map(p => (
-                      <div key={p.id} className={`flex items-center justify-between p-4 border rounded-xl transition-colors ${!p.isActive ? 'bg-stone-50 border-stone-200' : 'border-stone-300'}`}>
-                        <div className="flex items-center gap-3">
-                          <div className={`w-12 h-12 flex-shrink-0 flex items-center justify-center text-3xl overflow-hidden rounded-lg ${!p.isActive && 'opacity-40 grayscale'}`}>
-                            {p.imageUrl?.startsWith('http') ? <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" /> : <span>{p.imageUrl}</span>}
-                          </div>
-                          <div><span className={`text-sm font-bold pr-2 block ${!p.isActive ? 'text-stone-400 line-through' : 'text-stone-800'}`}>{p.name}</span><span className="text-xs font-medium text-stone-500">{formatCurrency(p.price)}</span></div>
-                        </div>
-                        
-                        {/* NOVO BOTÃO DE EXCLUIR */}
-                        <div className="flex items-center gap-3">
-                          <button onClick={() => handleDeleteProduct(p.id)} className="text-stone-400 hover:text-red-500 transition-colors p-1" title="Excluir Produto">
-                            <Trash2 size={18} />
-                          </button>
-                          <button onClick={() => toggleProductStatus(p.id, p.isActive)} className={`w-12 h-6 rounded-full relative transition-colors shadow-inner flex-shrink-0 ${p.isActive ? 'bg-[#008c43]' : 'bg-stone-300'}`}><div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all shadow-sm ${p.isActive ? 'left-7' : 'left-1'}`}></div></button>
-                        </div>
+                {/* CORREÇÃO DO LAYOUT DA GRELHA (MAX 3 COLUNAS) E FIX DE FLEXBOX */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {products.map(p => (
+                    <div key={p.id} className={`flex items-center p-4 border rounded-xl transition-colors gap-4 shadow-sm ${!p.isActive ? 'bg-stone-50 border-stone-200' : 'bg-white border-stone-200 hover:border-stone-300'}`}>
+                      
+                      <div className={`w-14 h-14 flex-shrink-0 flex items-center justify-center text-3xl overflow-hidden rounded-xl bg-stone-100 border border-stone-100 ${!p.isActive && 'opacity-40 grayscale'}`}>
+                        {p.imageUrl?.startsWith('http') ? <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" /> : <span>{p.imageUrl}</span>}
                       </div>
-                    ))}
-                  </div>
+                      
+                      {/* Envolver o texto com min-w-0 evita que empurre o resto da caixa */}
+                      <div className="flex flex-col flex-grow min-w-0">
+                        <span className={`text-sm font-bold truncate block ${!p.isActive ? 'text-stone-400 line-through' : 'text-stone-800'}`} title={p.name}>{p.name}</span>
+                        <span className="text-xs font-medium text-stone-500 mt-0.5">{formatCurrency(p.price)} / {p.unit}</span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 flex-shrink-0 border-l border-stone-100 pl-3">
+                        <button onClick={() => handleDeleteProduct(p.id)} className="text-stone-400 hover:text-red-500 transition-colors p-2 hover:bg-red-50 rounded-lg" title="Excluir Produto">
+                          <Trash2 size={16} />
+                        </button>
+                        <button onClick={() => toggleProductStatus(p.id, p.isActive)} className={`w-11 h-6 rounded-full relative transition-colors shadow-inner flex-shrink-0 ${p.isActive ? 'bg-[#008c43]' : 'bg-stone-300'}`}><div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all shadow-sm ${p.isActive ? 'left-6' : 'left-1'}`}></div></button>
+                      </div>
+
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
