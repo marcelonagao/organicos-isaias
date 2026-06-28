@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ShoppingCart, Leaf, MapPin, Calendar, 
   CreditCard, Banknote, ChevronLeft, ChevronRight, Plus, Minus, CheckCircle2,
-  Store, Search, User, Package, Clock, Truck, ShieldCheck, Map, ListChecks, Tags, BarChart3, TrendingUp, Menu, X, Edit2, Lock, Trash2, ImagePlus, Loader2, Download, Upload, AlertCircle, Database
+  Store, Search, User, Package, Clock, Truck, ShieldCheck, Map, ListChecks, Tags, BarChart3, TrendingUp, Menu, X, Edit2, Lock, Trash2, ImagePlus, Loader2, Download, Upload, AlertCircle, Database, Zap
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, signInWithEmailAndPassword, signOut } from 'firebase/auth';
@@ -25,6 +25,7 @@ const appId = firebaseConfig.projectId || 'default-app-id';
 
 // Função para formatar para Reais (BRL)
 const formatCurrency = (value) => {
+  if (value === undefined || value === null) return 'R$ 0,00';
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
@@ -140,7 +141,14 @@ export default function App() {
     const ordersRef = collection(db, 'artifacts', appId, 'public', 'data', 'orders');
     const unsubOrders = onSnapshot(ordersRef, (snapshot) => {
       const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      fetchedOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      
+      // Ordenação segura considerando que "createdAt" possa estar ausente em testes antigos
+      fetchedOrders.sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      });
+
       setAllOrders(fetchedOrders);
       setOrders(fetchedOrders.filter(o => o.userId === user.uid));
     });
@@ -179,10 +187,12 @@ export default function App() {
   const harvestList = useMemo(() => {
     const totals = {};
     adminFilteredOrders.forEach(order => {
-       order.items.forEach(item => {
-          if (!totals[item.productId]) totals[item.productId] = { name: item.name, quantity: 0 };
-          totals[item.productId].quantity += item.quantity;
-       });
+       if (order.items && Array.isArray(order.items)) {
+         order.items.forEach(item => {
+            if (!totals[item.productId]) totals[item.productId] = { name: item.name, quantity: 0 };
+            totals[item.productId].quantity += item.quantity;
+         });
+       }
     });
     return Object.values(totals).sort((a, b) => b.quantity - a.quantity);
   }, [adminFilteredOrders]);
@@ -190,7 +200,7 @@ export default function App() {
   const ordersByNeighborhood = useMemo(() => {
     const grouped = {};
     adminFilteredOrders.forEach(order => {
-       const nbhd = order.deliveryAddress.neighborhood || 'Bairro Não Informado';
+       const nbhd = order.deliveryAddress?.neighborhood || 'Bairro Não Informado';
        if (!grouped[nbhd]) grouped[nbhd] = [];
        grouped[nbhd].push(order);
     });
@@ -198,7 +208,7 @@ export default function App() {
   }, [adminFilteredOrders]);
 
   const dashboardKPIs = useMemo(() => {
-    const totalRevenue = allOrders.reduce((sum, order) => sum + (order.status !== 'cancelled' ? order.totalAmount : 0), 0);
+    const totalRevenue = allOrders.reduce((sum, order) => sum + (order.status !== 'cancelled' ? (order.totalAmount || 0) : 0), 0);
     const totalOrders = allOrders.length;
     const citySales = {};
     allOrders.forEach(order => {
@@ -648,11 +658,34 @@ export default function App() {
                         <div key={order.id} className="p-6 hover:bg-stone-50 transition-colors">
                           <div className="flex flex-col xl:flex-row justify-between gap-6">
                             <div className="flex-1">
-                              <h4 className="font-bold text-stone-800 text-lg mb-1">{order.customer.name}</h4><p className="text-sm text-stone-600 font-medium">{order.deliveryAddress.street}, {order.deliveryAddress.number}</p><p className="text-sm text-stone-500 mb-4">WhatsApp: {order.customer.phone}</p>
-                              <div className="bg-stone-100 rounded-xl p-4 inline-block w-full sm:w-auto"><p className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-2">Itens da Caixa</p><ul className="text-sm text-stone-700 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">{order.items.map(i => <li key={i.productId} className="flex gap-2"><span className="font-bold">{i.quantity}x</span> {i.name}</li>)}</ul></div>
+                              <h4 className="font-bold text-stone-800 text-lg mb-1">{order.customer?.name || 'Cliente'}</h4>
+                              <p className="text-sm text-stone-600 font-medium">
+                                {order.deliveryAddress?.street || 'Endereço Indisponível'}, {order.deliveryAddress?.number || 'S/N'}
+                              </p>
+                              <p className="text-sm text-stone-500 mb-4">WhatsApp: {order.customer?.phone || 'Não informado'}</p>
+                              <div className="bg-stone-100 rounded-xl p-4 inline-block w-full sm:w-auto">
+                                <p className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-2">Itens da Caixa</p>
+                                <ul className="text-sm text-stone-700 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
+                                  {order.items?.map((i, idx) => (
+                                    <li key={i.productId || idx} className="flex gap-2">
+                                      <span className="font-bold">{i.quantity}x</span> {i.name}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
                             </div>
                             <div className="flex flex-col lg:items-end w-full xl:w-72 gap-3">
-                              <div className={`p-4 rounded-xl border w-full text-center ${order.paymentInfo.method === 'cash' ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}><span className="block text-[11px] font-bold uppercase tracking-widest text-stone-500 mb-1">{order.paymentInfo.method === 'cash' ? 'Receber no Local' : 'Pago online'}</span><span className="text-3xl font-bold text-stone-800 block">{formatCurrency(order.totalAmount)}</span>{order.paymentInfo.method === 'cash' && order.paymentInfo.changeFor && (<span className="mt-2 inline-block text-xs font-bold text-green-800 bg-green-200 px-3 py-1 rounded-full">Troco para: {order.paymentInfo.changeFor}</span>)}</div>
+                              <div className={`p-4 rounded-xl border w-full text-center ${order.paymentInfo?.method === 'cash' ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
+                                <span className="block text-[11px] font-bold uppercase tracking-widest text-stone-500 mb-1">
+                                  {order.paymentInfo?.method === 'cash' ? 'Receber no Local' : 'Pago online'}
+                                </span>
+                                <span className="text-3xl font-bold text-stone-800 block">{formatCurrency(order.totalAmount || 0)}</span>
+                                {order.paymentInfo?.method === 'cash' && order.paymentInfo?.changeFor && (
+                                  <span className="mt-2 inline-block text-xs font-bold text-green-800 bg-green-200 px-3 py-1 rounded-full">
+                                    Troco para: {order.paymentInfo.changeFor}
+                                  </span>
+                                )}
+                              </div>
                               <div className="w-full flex gap-2">
                                 {order.status === 'pending' && <button onClick={() => updateOrderStatus(order.id, 'preparing')} className="w-full bg-stone-800 text-white py-3 rounded-xl text-sm font-bold hover:bg-stone-700 transition-colors">Marcar Separado</button>}
                                 {order.status === 'preparing' && <button onClick={() => updateOrderStatus(order.id, 'in_transit')} className="w-full bg-purple-600 text-white py-3 rounded-xl text-sm font-bold hover:bg-purple-700 transition-colors">Pôr no Carro</button>}
@@ -1212,15 +1245,36 @@ export default function App() {
             ) : (
               <div className="space-y-6">
                 {orders.map(order => {
-                  const StatusIcon = statusDict[order.status]?.icon || Clock;
+                  const StatusIcon = statusDict[order?.status]?.icon || Clock;
                   return (
                     <div key={order.id} className="bg-white rounded-3xl shadow-sm border border-stone-200 p-6 sm:p-8">
                       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 border-b border-stone-100 pb-6 gap-4">
-                        <div><span className="text-sm font-bold text-stone-400 uppercase tracking-widest block mb-1">Pedido #{order.id.slice(0,6).toUpperCase()}</span><span className="font-extrabold text-stone-800 text-lg block">Entrega: {order.deliveryDate}</span></div>
-                        <div className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 ${statusDict[order.status]?.color || 'bg-stone-100 text-stone-600'}`}><StatusIcon size={16} /> {statusDict[order.status]?.label || order.status}</div>
+                        <div>
+                          <span className="text-sm font-bold text-stone-400 uppercase tracking-widest block mb-1">
+                            Pedido #{order.id?.slice(0,6).toUpperCase() || 'N/A'}
+                          </span>
+                          <span className="font-extrabold text-stone-800 text-lg block">
+                            Entrega: {order?.deliveryDate || 'N/A'}
+                          </span>
+                        </div>
+                        <div className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 ${statusDict[order?.status]?.color || 'bg-stone-100 text-stone-600'}`}>
+                          <StatusIcon size={16} /> {statusDict[order?.status]?.label || order?.status || 'Recebido'}
+                        </div>
                       </div>
-                      <div className="mb-6"><p className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-3">Itens Comprados</p><ul className="text-sm text-stone-600 font-medium space-y-2">{order.items.map((item, idx) => (<li key={idx} className="flex gap-2"><span className="text-stone-800 font-bold">{item.quantity}x</span> {item.name}</li>))}</ul></div>
-                      <div className="flex justify-between items-center bg-stone-50 p-4 rounded-2xl border border-stone-100"><span className="text-sm font-bold text-stone-500 uppercase tracking-wider">Total Pago</span><span className="font-extrabold text-[#008c43] text-xl">{formatCurrency(order.totalAmount)}</span></div>
+                      <div className="mb-6">
+                        <p className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-3">Itens Comprados</p>
+                        <ul className="text-sm text-stone-600 font-medium space-y-2">
+                          {order.items && order.items.map((item, idx) => (
+                            <li key={idx} className="flex gap-2">
+                              <span className="text-stone-800 font-bold">{item.quantity || 1}x</span> {item.name || 'Produto Indisponível'}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div className="flex justify-between items-center bg-stone-50 p-4 rounded-2xl border border-stone-100">
+                        <span className="text-sm font-bold text-stone-500 uppercase tracking-wider">Total Pago</span>
+                        <span className="font-extrabold text-[#008c43] text-xl">{formatCurrency(order.totalAmount || 0)}</span>
+                      </div>
                     </div>
                   );
                 })}
